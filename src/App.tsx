@@ -124,7 +124,13 @@ export default function App() {
     myLocation,
     myProfile,
     submitSignal,
-  } = useRadar(roleFilter, symptomFilter, 'all', compareOpen ? beforePeriod : 'now');
+  } = useRadar(
+    roleFilter,
+    symptomFilter,
+    'all',
+    compareOpen ? beforePeriod : 'now',
+    compareOpen,
+  );
 
   const beforeSnapshot = snapshotsByPeriod[beforePeriod] ?? nowSnapshot;
   const afterSnapshot = snapshotsByPeriod[afterPeriod] ?? nowSnapshot;

@@ -23,6 +23,7 @@ import {
 
 interface SignalRow {
   id: string;
+  anon_token_hash: string;
   country_code: string;
   city_name: string | null;
   lat: number | null;
@@ -114,7 +115,7 @@ export async function buildRadarSnapshot(
     const whereSql =
       contextClauses.length > 0 ? `WHERE ${contextClauses.join(' AND ')}` : '';
     const stmt = db.prepare(
-      `SELECT id, country_code, city_name, lat, lng, level, context, role, domains, symptoms, created_at, updated_at
+      `SELECT id, anon_token_hash, country_code, city_name, lat, lng, level, context, role, domains, symptoms, created_at, updated_at
        FROM signals
        ${whereSql}
        ORDER BY updated_at DESC`,
@@ -127,10 +128,10 @@ export async function buildRadarSnapshot(
   } else {
     const outerWhere = ['rn = 1', ...contextClauses].join(' AND ');
     const stmt = db.prepare(
-      `SELECT id, country_code, city_name, lat, lng, level, context, role, domains, symptoms,
+      `SELECT id, anon_token_hash, country_code, city_name, lat, lng, level, context, role, domains, symptoms,
               recorded_at AS created_at, recorded_at AS updated_at
        FROM (
-         SELECT id, country_code, city_name, lat, lng, level, context, role, domains, symptoms, recorded_at,
+         SELECT id, anon_token_hash, country_code, city_name, lat, lng, level, context, role, domains, symptoms, recorded_at,
                 ROW_NUMBER() OVER (PARTITION BY anon_token_hash ORDER BY recorded_at DESC) AS rn
          FROM signal_history
          WHERE recorded_at <= ?
@@ -359,23 +360,27 @@ export async function buildRadarSnapshot(
     }))
     .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
 
-  const recent: RecentSignal[] = rows.slice(0, 20).map((row) => {
-    const syms = parseSymptoms(row.symptoms);
-    const domains = parseDomains(row.domains, row.role);
-    return {
-      id: row.id,
-      countryCode: row.country_code,
-      cityName: row.city_name,
-      lat: row.lat,
-      lng: row.lng,
-      level: Math.max(0, Math.min(3, Number(row.level))) as UsageLevel,
-      context: (row.context as UsageContext) || 'none',
-      role: domains[0] ?? null,
-      domains,
-      symptom: syms[0] ?? null,
-      createdAt: row.updated_at,
-    };
-  });
+  // Only include real organic check-ins in the live ticker (never seeded baseline rows)
+  const recent: RecentSignal[] = rows
+    .filter((row) => !row.anon_token_hash.startsWith('baseline-'))
+    .slice(0, 20)
+    .map((row) => {
+      const syms = parseSymptoms(row.symptoms);
+      const domains = parseDomains(row.domains, row.role);
+      return {
+        id: row.id,
+        countryCode: row.country_code,
+        cityName: row.city_name,
+        lat: row.lat,
+        lng: row.lng,
+        level: Math.max(0, Math.min(3, Number(row.level))) as UsageLevel,
+        context: (row.context as UsageContext) || 'none',
+        role: domains[0] ?? null,
+        domains,
+        symptom: syms[0] ?? null,
+        createdAt: row.updated_at,
+      };
+    });
 
   return {
     generatedAt: now,

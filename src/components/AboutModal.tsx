@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ArrowRight, Globe2, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { ArrowRight, Database, Globe2, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { useAnimatedModal } from '../hooks/useAnimatedModal';
 import type { Dictionary } from '../i18n/translations';
 import { BrandLogo } from './Logo';
@@ -125,6 +125,20 @@ export function AboutModal({
                 </div>
                 <p className="mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
                   {t.aboutPointJoinDesc}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/60">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-400">
+                <Database className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-slate-900 dark:text-white">
+                  {t.aboutPointBaselineTitle}
+                </div>
+                <p className="mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                  {t.aboutPointBaselineDesc}
                 </p>
               </div>
             </div>

@@ -787,7 +787,7 @@ export function SurveyModal({
                 className="inline-flex h-11 items-center gap-1.5 rounded-xl bg-slate-900 px-5 text-sm font-bold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
               >
                 <Check className="h-4 w-4" />
-                {t.surveySubmit}
+                {t.surveyLocationApply}
               </button>
             </>
           ) : (

@@ -33,6 +33,49 @@ const NO_AI_REASON_SET = new Set<string>(NO_AI_REASONS);
 const PERIOD_SET = new Set<string>(HISTORY_PERIODS);
 const FEEDBACK_KIND_SET = new Set<string>(FEEDBACK_KINDS);
 
+function getEdgeCache(): Cache | null {
+  try {
+    const cacheStorage = caches as unknown as { default?: Cache };
+    return cacheStorage?.default ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function buildSnapshotCacheRequest(
+  requestUrl: string,
+  params: {
+    role: string;
+    symptom: string;
+    context: string;
+    period: string;
+  },
+): Request {
+  const url = new URL('/api/snapshot', requestUrl);
+  url.searchParams.set('role', params.role);
+  url.searchParams.set('symptom', params.symptom);
+  url.searchParams.set('context', params.context);
+  url.searchParams.set('period', params.period);
+  return new Request(url.toString(), { method: 'GET' });
+}
+
+function isAllowedWriteRequest(request: Request, appEnv?: string): boolean {
+  if (appEnv !== 'production') return true;
+  const origin = request.headers.get('origin');
+  if (origin) {
+    try {
+      return new URL(origin).origin === new URL(request.url).origin;
+    } catch {
+      return false;
+    }
+  }
+  const fetchSite = request.headers.get('sec-fetch-site');
+  if (fetchSite && fetchSite === 'cross-site') {
+    return false;
+  }
+  return true;
+}
+
 app.get('/api/health', (c) => {
   return c.json({ ok: true, brand: APP_CONFIG.brandName, ts: Date.now() });
 });
@@ -65,6 +108,25 @@ app.get('/api/snapshot', async (c) => {
     ? (rawPeriod as HistoryPeriod)
     : 'now';
 
+  const edgeCache = getEdgeCache();
+  const cacheKey = buildSnapshotCacheRequest(c.req.url, {
+    role,
+    symptom,
+    context,
+    period,
+  });
+
+  if (edgeCache) {
+    try {
+      const cached = await edgeCache.match(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    } catch {
+      // fallback to D1
+    }
+  }
+
   const snapshot = await buildRadarSnapshot(c.env.DB, {
     role,
     symptom,
@@ -73,12 +135,26 @@ app.get('/api/snapshot', async (c) => {
   });
 
   const ttl = period === 'now' ? APP_CONFIG.snapshotCacheSeconds : 60;
-  return c.json(snapshot, 200, {
-    'Cache-Control': `public, max-age=${ttl}, stale-while-revalidate=${ttl * 2}`,
+  const response = c.json(snapshot, 200, {
+    'Cache-Control': `public, max-age=${ttl}, s-maxage=${ttl}, stale-while-revalidate=${ttl * 2}`,
   });
+
+  if (edgeCache) {
+    try {
+      c.executionCtx.waitUntil(edgeCache.put(cacheKey, response.clone()));
+    } catch {
+      // ignore outside Workers executionCtx
+    }
+  }
+
+  return response;
 });
 
 app.post('/api/signal', async (c) => {
+  if (!isAllowedWriteRequest(c.req.raw, c.env.APP_ENV)) {
+    return c.json({ error: 'Cross-site requests are not allowed' }, 403);
+  }
+
   let body: Partial<SignalSubmission> & { role?: RoleId };
   try {
     body = await c.req.json();
@@ -171,13 +247,26 @@ app.post('/api/signal', async (c) => {
 
   if (c.env.APP_ENV === 'production') {
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
-    const recentCount = await c.env.DB.prepare(
-      'SELECT COUNT(*) as cnt FROM signals WHERE ip_hash = ? AND updated_at > ?',
-    )
-      .bind(ipHash, oneHourAgo)
-      .first<{ cnt: number }>();
+    const [existingToken, recentStats] = await Promise.all([
+      c.env.DB.prepare('SELECT 1 as ok FROM signals WHERE anon_token_hash = ?')
+        .bind(anonTokenHash)
+        .first<{ ok: number }>(),
+      c.env.DB.prepare(
+        `SELECT
+           COUNT(*) as total_cnt,
+           COALESCE(SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END), 0) as new_cnt
+         FROM signals
+         WHERE ip_hash = ? AND updated_at > ?`,
+      )
+        .bind(oneHourAgo, ipHash, oneHourAgo)
+        .first<{ total_cnt: number; new_cnt: number }>(),
+    ]);
 
-    if ((recentCount?.cnt ?? 0) >= 20) {
+    const isNewVote = !existingToken;
+    if (
+      (isNewVote && (recentStats?.new_cnt ?? 0) >= 5) ||
+      (recentStats?.total_cnt ?? 0) >= 12
+    ) {
       return c.json(
         { error: 'Too many signals from this network. Please try again later.' },
         429,
@@ -198,10 +287,30 @@ app.post('/api/signal', async (c) => {
     symptoms,
   });
 
+  // Invalidate default live snapshot cache so the submitter immediately sees their check-in
+  const edgeCache = getEdgeCache();
+  if (edgeCache) {
+    try {
+      const defaultNowKey = buildSnapshotCacheRequest(c.req.url, {
+        role: 'all',
+        symptom: 'all',
+        context: 'all',
+        period: 'now',
+      });
+      c.executionCtx.waitUntil(edgeCache.delete(defaultNowKey));
+    } catch {
+      // ignore outside Workers executionCtx
+    }
+  }
+
   return c.json(report, 200, { 'Cache-Control': 'no-store' });
 });
 
 app.post('/api/feedback', async (c) => {
+  if (!isAllowedWriteRequest(c.req.raw, c.env.APP_ENV)) {
+    return c.json({ error: 'Cross-site requests are not allowed' }, 403);
+  }
+
   let body: Partial<FeedbackSubmission>;
   try {
     body = await c.req.json();

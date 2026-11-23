@@ -190,6 +190,12 @@ export interface Dictionary {
   feedbackDone: string;
   aboutFeedbackLink: string;
   disputedTerritory: string;
+  aboutPointBaselineTitle: string;
+  aboutPointBaselineDesc: string;
+  surveyLocationApply: string;
+  reportDownloadCard: string;
+  reportCardSaved: string;
+  mapLoading: string;
 }
 
 const EN: Dictionary = {
@@ -441,6 +447,12 @@ const EN: Dictionary = {
   feedbackDone: 'Done',
   aboutFeedbackLink: 'Have an idea or found a bug? Send feedback',
   disputedTerritory: 'Disputed territory',
+  aboutPointBaselineTitle: 'Data & starting baseline',
+  aboutPointBaselineDesc: 'The starting map and 12-month history are calibrated from public 2024–2026 global studies (Ipsos, Pew Research, Microsoft) and continuously updated by live anonymous answers. The LIVE ticker shows only real check-ins.',
+  surveyLocationApply: 'Apply',
+  reportDownloadCard: 'Save card',
+  reportCardSaved: 'Saved!',
+  mapLoading: 'Loading world map...',
 };
 
 const RU: Dictionary = {
@@ -692,6 +704,12 @@ const RU: Dictionary = {
   feedbackDone: 'Готово',
   aboutFeedbackLink: 'Есть идея или нашёлся баг? Написать нам',
   disputedTerritory: 'Спорная территория',
+  aboutPointBaselineTitle: 'Данные и стартовый слой',
+  aboutPointBaselineDesc: 'Стартовая карта и точка «год назад» откалиброваны по публичным глобальным исследованиям 2024–2026 (Ipsos, Pew Research, Microsoft) и постепенно замещаются живыми анонимными ответами. В ленте LIVE — только реальные отметки.',
+  surveyLocationApply: 'Применить',
+  reportDownloadCard: 'Сохранить карточку',
+  reportCardSaved: 'Сохранено!',
+  mapLoading: 'Загружаем карту мира...',
 };
 
 const ES: Dictionary = {
@@ -939,6 +957,12 @@ const ES: Dictionary = {
   feedbackDone: 'Listo',
   aboutFeedbackLink: '¿Tienes una idea o encontraste un error? Escríbenos',
   disputedTerritory: 'Territorio en disputa',
+  aboutPointBaselineTitle: 'Datos y línea base inicial',
+  aboutPointBaselineDesc: 'El mapa inicial y el historial de 12 meses están calibrados con estudios globales públicos de 2024–2026 (Ipsos, Pew Research, Microsoft) y se actualizan con respuestas anónimas reales. La barra LIVE muestra solo respuestas reales.',
+  surveyLocationApply: 'Aplicar',
+  reportDownloadCard: 'Guardar tarjeta',
+  reportCardSaved: '¡Guardada!',
+  mapLoading: 'Cargando mapa mundial...',
 };
 
 const PT_BR: Dictionary = {
@@ -1186,6 +1210,12 @@ const PT_BR: Dictionary = {
   feedbackDone: 'Pronto',
   aboutFeedbackLink: 'Tem uma ideia ou achou um bug? Fale conosco',
   disputedTerritory: 'Território em disputa',
+  aboutPointBaselineTitle: 'Dados e base inicial',
+  aboutPointBaselineDesc: 'O mapa inicial e o histórico de 12 meses são calibrados com estudos globais públicos de 2024–2026 (Ipsos, Pew Research, Microsoft) e atualizados continuamente por respostas anônimas reais. A faixa LIVE exibe apenas respostas reais.',
+  surveyLocationApply: 'Aplicar',
+  reportDownloadCard: 'Salvar cartão',
+  reportCardSaved: 'Salvo!',
+  mapLoading: 'Carregando mapa mundial...',
 };
 
 const JA: Dictionary = {
@@ -1433,6 +1463,12 @@ const JA: Dictionary = {
   feedbackDone: '閉じる',
   aboutFeedbackLink: 'アイデアや不具合がありますか？送る',
   disputedTerritory: '係争地域',
+  aboutPointBaselineTitle: 'データと初期ベースライン',
+  aboutPointBaselineDesc: '初期マップと過去12か月の履歴は2024–2026年の公開調査（Ipsos・Pew Research・Microsoft）を基に調整されており、実際の匿名回答によって随時更新されます。LIVEティッカーには実際の回答のみ表示されます。',
+  surveyLocationApply: '適用',
+  reportDownloadCard: 'カードを保存',
+  reportCardSaved: '保存しました！',
+  mapLoading: '世界地図を読み込み中...',
 };
 
 const KO: Dictionary = {
@@ -1680,6 +1716,12 @@ const KO: Dictionary = {
   feedbackDone: '완료',
   aboutFeedbackLink: '아이디어나 버그가 있나요? 의견 보내기',
   disputedTerritory: '분쟁 지역',
+  aboutPointBaselineTitle: '데이터 및 초기 기준선',
+  aboutPointBaselineDesc: '초기 지도와 12개월 기록은 2024–2026년 공개 글로벌 조사(Ipsos, Pew Research, Microsoft)를 바탕으로 보정되었으며, 실시간 익명 응답으로 점차 대체됩니다. LIVE 티커에는 실제 응답만 표시됩니다.',
+  surveyLocationApply: '적용',
+  reportDownloadCard: '카드 저장',
+  reportCardSaved: '저장됨!',
+  mapLoading: '세계 지도 불러오는 중...',
 };
 
 const DE: Dictionary = {
@@ -1927,6 +1969,12 @@ const DE: Dictionary = {
   feedbackDone: 'Fertig',
   aboutFeedbackLink: 'Idee oder Bug gefunden? Schreib uns',
   disputedTerritory: 'Umstrittenes Gebiet',
+  aboutPointBaselineTitle: 'Daten & Ausgangsbasis',
+  aboutPointBaselineDesc: 'Die Startkarte und der 12-Monats-Verlauf basieren auf öffentlichen Studien von 2024–2026 (Ipsos, Pew Research, Microsoft) und werden laufend durch echte anonyme Antworten ergänzt. Der LIVE-Ticker zeigt nur echte Einträge.',
+  surveyLocationApply: 'Übernehmen',
+  reportDownloadCard: 'Karte speichern',
+  reportCardSaved: 'Gespeichert!',
+  mapLoading: 'Weltkarte wird geladen...',
 };
 
 const DICTIONARIES: Record<Locale, Dictionary> = {

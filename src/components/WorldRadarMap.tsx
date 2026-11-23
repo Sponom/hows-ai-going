@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { geoNaturalEarth1, geoPath, type GeoPermissibleObjects } from 'd3-geo';
+import {
+  geoNaturalEarth1,
+  geoPath,
+  type GeoPath,
+  type GeoPermissibleObjects,
+  type GeoProjection,
+} from 'd3-geo';
 import { select } from 'd3-selection';
 import { zoom, zoomIdentity, type ZoomBehavior } from 'd3-zoom';
 import { feature } from 'topojson-client';
-import worldAtlas from 'world-atlas/countries-50m.json';
-import disputedAreas from '../data/disputed-areas.json';
 import { Check, ChevronDown, ChevronsLeftRight, Globe, Minus, Plus } from 'lucide-react';
 import { NUMERIC_TO_ALPHA2 } from '../../shared/geo-codes';
 import {
@@ -67,6 +71,83 @@ interface HoverState {
 const WIDTH = 1040;
 const HEIGHT = 520;
 const MAX_ZOOM = 24;
+
+interface MapGeometry {
+  features: Array<GeoPermissibleObjects & { id?: string | number }>;
+  projection: GeoProjection;
+  pathGenerator: GeoPath<unknown, GeoPermissibleObjects>;
+  featurePaths: Array<{ key: string; alpha2: string | undefined; d: string }>;
+  disputedPaths: Array<{ key: string; d: string }>;
+}
+
+let cachedMapGeometry: MapGeometry | null = null;
+let mapGeometryPromise: Promise<MapGeometry> | null = null;
+
+function loadMapGeometry(): Promise<MapGeometry> {
+  if (cachedMapGeometry) return Promise.resolve(cachedMapGeometry);
+  if (mapGeometryPromise) return mapGeometryPromise;
+
+  mapGeometryPromise = Promise.all([
+    import('world-atlas/countries-50m.json'),
+    import('../data/disputed-areas.json'),
+  ]).then(([worldAtlasMod, disputedAreasMod]) => {
+    const worldAtlas = worldAtlasMod.default;
+    const disputedAreas = disputedAreasMod.default;
+
+    const topo = worldAtlas as unknown as Parameters<typeof feature>[0];
+    const countriesObj = (
+      worldAtlas as unknown as {
+        objects: { countries: Parameters<typeof feature>[1] };
+      }
+    ).objects.countries;
+    const fc = feature(topo, countriesObj) as unknown as {
+      type: 'FeatureCollection';
+      features: Array<GeoPermissibleObjects & { id?: string | number }>;
+    };
+    const filtered = fc.features.filter((f) => String(f.id) !== '010');
+
+    const proj = geoNaturalEarth1().fitExtent(
+      [
+        [14, 14],
+        [WIDTH - 14, HEIGHT - 14],
+      ],
+      {
+        type: 'FeatureCollection',
+        features: filtered,
+      } as unknown as GeoPermissibleObjects,
+    );
+    const pg = geoPath(proj);
+    const paths = filtered.map((feat, idx) => {
+      const numericId = String(feat.id ?? '').padStart(3, '0');
+      return {
+        key: `${numericId}-${idx}`,
+        alpha2: NUMERIC_TO_ALPHA2[numericId],
+        d: pg(feat) ?? '',
+      };
+    });
+
+    const disputedFc = disputedAreas as unknown as {
+      features: Array<GeoPermissibleObjects & { id?: string; properties?: { name?: string } }>;
+    };
+    const dPaths = disputedFc.features
+      .map((feat, idx) => ({
+        key: feat.id ?? `disp-${idx}`,
+        d: pg(feat) ?? '',
+      }))
+      .filter((item) => item.d.length > 0);
+
+    cachedMapGeometry = {
+      features: filtered,
+      projection: proj,
+      pathGenerator: pg,
+      featurePaths: paths,
+      disputedPaths: dPaths,
+    };
+    return cachedMapGeometry;
+  });
+
+  return mapGeometryPromise;
+}
 
 function formatPeriodDate(period: HistoryPeriod, locale: Locale): string {
   const d = new Date();
@@ -251,57 +332,28 @@ export function WorldRadarMap({
     return map;
   }, [nowCountries, countries]);
 
-  const { features, projection, pathGenerator, featurePaths, disputedPaths } = useMemo(() => {
-    const topo = worldAtlas as unknown as Parameters<typeof feature>[0];
-    const countriesObj = (
-      worldAtlas as unknown as {
-        objects: { countries: Parameters<typeof feature>[1] };
-      }
-    ).objects.countries;
-    const fc = feature(topo, countriesObj) as unknown as {
-      type: 'FeatureCollection';
-      features: Array<GeoPermissibleObjects & { id?: string | number }>;
-    };
-    const filtered = fc.features.filter((f) => String(f.id) !== '010');
+  const [mapGeometry, setMapGeometry] = useState<MapGeometry | null>(
+    () => cachedMapGeometry,
+  );
 
-    const proj = geoNaturalEarth1().fitExtent(
-      [
-        [14, 14],
-        [WIDTH - 14, HEIGHT - 14],
-      ],
-      {
-        type: 'FeatureCollection',
-        features: filtered,
-      } as unknown as GeoPermissibleObjects,
-    );
-    const pg = geoPath(proj);
-    const paths = filtered.map((feat, idx) => {
-      const numericId = String(feat.id ?? '').padStart(3, '0');
-      return {
-        key: `${numericId}-${idx}`,
-        alpha2: NUMERIC_TO_ALPHA2[numericId],
-        d: pg(feat) ?? '',
-      };
-    });
-
-    const disputedFc = disputedAreas as unknown as {
-      features: Array<GeoPermissibleObjects & { id?: string; properties?: { name?: string } }>;
+  useEffect(() => {
+    if (mapGeometry) return;
+    let cancelled = false;
+    loadMapGeometry()
+      .then((geo) => {
+        if (!cancelled) setMapGeometry(geo);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
     };
-    const dPaths = disputedFc.features
-      .map((feat, idx) => ({
-        key: feat.id ?? `disp-${idx}`,
-        d: pg(feat) ?? '',
-      }))
-      .filter((item) => item.d.length > 0);
+  }, [mapGeometry]);
 
-    return {
-      features: filtered,
-      projection: proj,
-      pathGenerator: pg,
-      featurePaths: paths,
-      disputedPaths: dPaths,
-    };
-  }, []);
+  const features = mapGeometry?.features ?? [];
+  const projection = mapGeometry?.projection ?? null;
+  const pathGenerator = mapGeometry?.pathGenerator ?? null;
+  const featurePaths = mapGeometry?.featurePaths ?? [];
+  const disputedPaths = mapGeometry?.disputedPaths ?? [];
 
   useEffect(() => {
     if (!svgRef.current) return;
@@ -340,6 +392,8 @@ export function WorldRadarMap({
       return;
     }
 
+    if (!pathGenerator || features.length === 0) return;
+
     const feat = features.find((f) => {
       const numericId = String(f.id ?? '').padStart(3, '0');
       return NUMERIC_TO_ALPHA2[numericId] === selectedCountry;
@@ -372,7 +426,7 @@ export function WorldRadarMap({
 
   // Smoothly fly to focused city / newly submitted location
   useEffect(() => {
-    if (!focusTarget) return;
+    if (!focusTarget || !projection) return;
     const projected = projection([focusTarget.lng, focusTarget.lat]);
     if (!projected) return;
     const [px, py] = projected;
@@ -458,11 +512,13 @@ export function WorldRadarMap({
   const baseCountryMap = showSplit ? nowCountryMap : countryMap;
   const baseCities = showSplit ? (nowCities ?? cities) : cities;
 
-  const renderCityLayer = (cityList: CityStat[], interactive: boolean) => (
-    <g pointerEvents={interactive ? undefined : 'none'}>
-      {cityList.map((city) => {
-        if (city.lat === null || city.lng === null) return null;
-        const pt = projection([city.lng, city.lat]);
+  const renderCityLayer = (cityList: CityStat[], interactive: boolean) => {
+    if (!projection) return null;
+    return (
+      <g pointerEvents={interactive ? undefined : 'none'}>
+        {cityList.map((city) => {
+          if (city.lat === null || city.lng === null) return null;
+          const pt = projection([city.lng, city.lat]);
         if (!pt) return null;
         const [cx, cy] = pt;
         const isSelected = selectedCityKey === city.key;
@@ -561,7 +617,8 @@ export function WorldRadarMap({
         );
       })}
     </g>
-  );
+    );
+  };
 
   return (
     <div
@@ -570,6 +627,14 @@ export function WorldRadarMap({
         isDark ? 'radar-bg-dark' : 'radar-bg-light'
       }`}
     >
+      {!mapGeometry && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+          <div className="flex items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-[#0d1526]/90 dark:text-slate-300">
+            <span className="h-2 w-2 rounded-full bg-cyan-500 animate-ping" />
+            <span>{t.mapLoading}</span>
+          </div>
+        </div>
+      )}
       <svg
         ref={svgRef}
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}

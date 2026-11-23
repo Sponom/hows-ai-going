@@ -74,6 +74,7 @@ export function useRadar(
   symptomFilter: SymptomId | 'all',
   contextFilter: UsageContext | 'all',
   period: HistoryPeriod = 'now',
+  loadHistory = false,
 ) {
   const [snapshotsByPeriod, setSnapshotsByPeriod] = useState<
     Partial<Record<HistoryPeriod, RadarSnapshot>>
@@ -98,6 +99,7 @@ export function useRadar(
   const filterKey = `${roleFilter}|${symptomFilter}|${contextFilter}`;
   const filterKeyRef = useRef(filterKey);
   filterKeyRef.current = filterKey;
+  const historyLoadedKeyRef = useRef<string | null>(null);
 
   const fetchForPeriod = useCallback(
     async (targetPeriod: HistoryPeriod, expectedFilterKey: string) => {
@@ -117,23 +119,24 @@ export function useRadar(
     [roleFilter, symptomFilter, contextFilter],
   );
 
-  // Fetch 'now' immediately and prefetch historical periods smoothly for zero-lag scrubbing
+  // Fetch 'now' immediately and poll gently (60s, paused while tab is hidden)
   useEffect(() => {
     let cancelled = false;
     const currentKey = filterKey;
+    let lastFetchedAt = 0;
 
-    const loadInitial = async () => {
+    // Clear stale historical slices when filters change so history reloads on demand
+    historyLoadedKeyRef.current = null;
+    setSnapshotsByPeriod((prev) => (prev.now ? { now: prev.now } : {}));
+
+    const loadNow = async () => {
       try {
         await fetchForPeriod('now', currentKey);
+        lastFetchedAt = Date.now();
         if (!cancelled) {
           setError(null);
           setLoading(false);
         }
-        // Quietly warm the 4 historical periods in parallel so dragging the slider is instant
-        const pastPeriods = HISTORY_PERIODS.filter((p) => p !== 'now');
-        await Promise.allSettled(
-          pastPeriods.map((p) => fetchForPeriod(p, currentKey)),
-        );
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load radar');
@@ -142,23 +145,46 @@ export function useRadar(
       }
     };
 
-    loadInitial();
+    loadNow();
 
     const timer = window.setInterval(() => {
-      fetchForPeriod('now', currentKey).catch(() => {});
-    }, 20000);
+      if (document.hidden) return;
+      fetchForPeriod('now', currentKey)
+        .then(() => {
+          lastFetchedAt = Date.now();
+        })
+        .catch(() => {});
+    }, 60_000);
+
+    const handleVisibility = () => {
+      if (!document.hidden && Date.now() - lastFetchedAt >= 60_000) {
+        fetchForPeriod('now', currentKey)
+          .then(() => {
+            lastFetchedAt = Date.now();
+          })
+          .catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [fetchForPeriod, filterKey]);
 
-  // If user switches to a period that hasn't finished prefetching yet, prioritize it
+  // Only load historical periods (12m/6m/3m) once when the user opens "World then & now"
   useEffect(() => {
-    if (period === 'now' || snapshotsByPeriod[period]) return;
-    fetchForPeriod(period, filterKey).catch(() => {});
-  }, [period, snapshotsByPeriod, fetchForPeriod, filterKey]);
+    if (!loadHistory) return;
+    if (historyLoadedKeyRef.current === filterKey) return;
+    historyLoadedKeyRef.current = filterKey;
+    const currentKey = filterKey;
+    const pastPeriods = HISTORY_PERIODS.filter((p) => p !== 'now');
+    Promise.allSettled(
+      pastPeriods.map((p) => fetchForPeriod(p, currentKey)),
+    ).catch(() => {});
+  }, [loadHistory, fetchForPeriod, filterKey]);
 
   useEffect(() => {
     fetch('/api/geo')
