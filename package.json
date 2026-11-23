@@ -1,0 +1,45 @@
+{
+  "name": "hows-ai-going",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,magenta \"vite\" \"wrangler dev --port 8787\"",
+    "dev:web": "vite",
+    "dev:api": "wrangler dev --port 8787",
+    "build": "tsc -b && vite build",
+    "preview": "vite build && wrangler dev --port 8787",
+    "db:migrate:local": "wrangler d1 migrations apply hows-ai-going-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply hows-ai-going-db --remote",
+    "db:seed:local": "wrangler d1 execute hows-ai-going-db --local --file=./scripts/seed-baseline.sql",
+    "db:reset:local": "rm -rf .wrangler/state/v3/d1 && pnpm db:migrate:local",
+    "deploy": "pnpm build && wrangler deploy"
+  },
+  "dependencies": {
+    "d3-geo": "^3.1.1",
+    "d3-selection": "^3.0.0",
+    "d3-zoom": "^3.0.0",
+    "hono": "^4.7.0",
+    "lucide-react": "^0.475.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250214.0",
+    "@tailwindcss/vite": "^4.0.9",
+    "@types/d3-geo": "^3.1.0",
+    "@types/d3-selection": "^3.0.11",
+    "@types/d3-zoom": "^3.0.8",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@types/topojson-client": "^3.1.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "tailwindcss": "^4.0.9",
+    "typescript": "^5.7.3",
+    "vite": "^6.2.0",
+    "wrangler": "^3.112.0"
+  }
+}

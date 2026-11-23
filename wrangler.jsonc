@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hows-ai-going",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-02-14",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hows-ai-going-db",
+      "database_id": "69c6ee61-5eb7-48c7-a9c3-8745fe64f551",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "APP_ENV": "production"
+  }
+}

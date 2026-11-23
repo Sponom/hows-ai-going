@@ -1,0 +1,278 @@
+import { Hono } from 'hono';
+import { APP_CONFIG } from '../shared/config';
+import { ALPHA2_SET, roundCoord } from '../shared/geo-codes';
+import {
+  AI_SYMPTOMS,
+  NO_AI_REASONS,
+  ROLES,
+  deriveContextFromDomains,
+  type RoleId,
+  type SymptomId,
+  type UsageContext,
+  type UsageLevel,
+} from '../shared/taxonomy';
+import {
+  FEEDBACK_KINDS,
+  HISTORY_PERIODS,
+  type FeedbackKind,
+  type FeedbackSubmission,
+  type HistoryPeriod,
+  type SignalSubmission,
+} from '../shared/types';
+import { hashAnonToken, hashIpDaily } from './crypto';
+import { buildRadarSnapshot, insertFeedback, upsertSignal } from './db';
+import type { Env } from './env';
+import { extractGeoFromRequest, sanitizeCityName } from './geo';
+
+const app = new Hono<{ Bindings: Env }>();
+
+const ROLE_SET = new Set<string>(ROLES);
+const CONTEXT_SET = new Set<string>(['none', 'personal', 'work', 'both']);
+const AI_SYMPTOM_SET = new Set<string>(AI_SYMPTOMS);
+const NO_AI_REASON_SET = new Set<string>(NO_AI_REASONS);
+const PERIOD_SET = new Set<string>(HISTORY_PERIODS);
+const FEEDBACK_KIND_SET = new Set<string>(FEEDBACK_KINDS);
+
+app.get('/api/health', (c) => {
+  return c.json({ ok: true, brand: APP_CONFIG.brandName, ts: Date.now() });
+});
+
+app.get('/api/geo', (c) => {
+  const geo = extractGeoFromRequest(c.req.raw);
+  return c.json(geo, 200, {
+    'Cache-Control': 'no-store',
+  });
+});
+
+app.get('/api/snapshot', async (c) => {
+  const rawRole = c.req.query('role') ?? 'all';
+  const rawSymptom = c.req.query('symptom') ?? 'all';
+  const rawContext = c.req.query('context') ?? 'all';
+  const rawPeriod = c.req.query('period') ?? 'now';
+
+  const role: RoleId | 'all' =
+    rawRole !== 'all' && ROLE_SET.has(rawRole) ? (rawRole as RoleId) : 'all';
+  const symptom: SymptomId | 'all' =
+    rawSymptom !== 'all' &&
+    (AI_SYMPTOM_SET.has(rawSymptom) || NO_AI_REASON_SET.has(rawSymptom))
+      ? (rawSymptom as SymptomId)
+      : 'all';
+  const context: UsageContext | 'all' =
+    rawContext !== 'all' && CONTEXT_SET.has(rawContext)
+      ? (rawContext as UsageContext)
+      : 'all';
+  const period: HistoryPeriod = PERIOD_SET.has(rawPeriod)
+    ? (rawPeriod as HistoryPeriod)
+    : 'now';
+
+  const snapshot = await buildRadarSnapshot(c.env.DB, {
+    role,
+    symptom,
+    context,
+    period,
+  });
+
+  const ttl = period === 'now' ? APP_CONFIG.snapshotCacheSeconds : 60;
+  return c.json(snapshot, 200, {
+    'Cache-Control': `public, max-age=${ttl}, stale-while-revalidate=${ttl * 2}`,
+  });
+});
+
+app.post('/api/signal', async (c) => {
+  let body: Partial<SignalSubmission> & { role?: RoleId };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON payload' }, 400);
+  }
+
+  const anonToken =
+    typeof body.anonToken === 'string' ? body.anonToken.trim() : '';
+  if (anonToken.length < 8 || anonToken.length > 128) {
+    return c.json({ error: 'Invalid anonymous token' }, 400);
+  }
+
+  const edgeGeo = extractGeoFromRequest(c.req.raw);
+  const countryCode = (
+    typeof body.countryCode === 'string' && body.countryCode.trim()
+      ? body.countryCode.trim().toUpperCase()
+      : edgeGeo.countryCode ?? ''
+  ).toUpperCase();
+
+  if (!ALPHA2_SET.has(countryCode)) {
+    return c.json({ error: 'Valid ISO country code is required' }, 400);
+  }
+
+  const cityName =
+    body.cityName === null
+      ? null
+      : typeof body.cityName === 'string'
+        ? sanitizeCityName(body.cityName)
+        : edgeGeo.cityName;
+
+  const lat =
+    cityName === null
+      ? null
+      : roundCoord(typeof body.lat === 'number' ? body.lat : edgeGeo.lat);
+  const lng =
+    cityName === null
+      ? null
+      : roundCoord(typeof body.lng === 'number' ? body.lng : edgeGeo.lng);
+
+  const level = Number(body.level);
+  if (!Number.isInteger(level) || level < 0 || level > 3) {
+    return c.json({ error: 'Level must be an integer between 0 and 3' }, 400);
+  }
+
+  // Parse multi-select domains (1..5) with fallback to legacy `role`
+  const rawDomains = Array.isArray(body.domains)
+    ? body.domains
+    : body.role
+      ? [body.role]
+      : [];
+  const domains: RoleId[] = Array.from(
+    new Set(
+      rawDomains.filter(
+        (d): d is RoleId => typeof d === 'string' && ROLE_SET.has(d),
+      ),
+    ),
+  ).slice(0, 5);
+
+  if (domains.length === 0) {
+    return c.json({ error: 'Select at least 1 area' }, 400);
+  }
+
+  const context: UsageContext =
+    level === 0
+      ? 'none'
+      : body.context && ['personal', 'work', 'both'].includes(body.context)
+        ? (body.context as UsageContext)
+        : deriveContextFromDomains(level as UsageLevel, domains);
+
+  // Symptoms / use-cases are optional and allow selecting any number
+  const validSymptomSet = level === 0 ? NO_AI_REASON_SET : AI_SYMPTOM_SET;
+  const symptoms = Array.isArray(body.symptoms)
+    ? Array.from(
+        new Set(
+          body.symptoms.filter(
+            (s): s is SymptomId =>
+              typeof s === 'string' && validSymptomSet.has(s),
+          ),
+        ),
+      ).slice(0, 10)
+    : [];
+
+  const salt = c.env.HASH_SALT || 'default-dev-salt';
+  const ip =
+    c.req.header('cf-connecting-ip') ||
+    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+    '127.0.0.1';
+
+  const [anonTokenHash, ipHash] = await Promise.all([
+    hashAnonToken(anonToken, salt),
+    hashIpDaily(ip, salt),
+  ]);
+
+  if (c.env.APP_ENV === 'production') {
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    const recentCount = await c.env.DB.prepare(
+      'SELECT COUNT(*) as cnt FROM signals WHERE ip_hash = ? AND updated_at > ?',
+    )
+      .bind(ipHash, oneHourAgo)
+      .first<{ cnt: number }>();
+
+    if ((recentCount?.cnt ?? 0) >= 20) {
+      return c.json(
+        { error: 'Too many signals from this network. Please try again later.' },
+        429,
+      );
+    }
+  }
+
+  const report = await upsertSignal(c.env.DB, {
+    anonTokenHash,
+    ipHash,
+    countryCode,
+    cityName,
+    lat,
+    lng,
+    level: level as UsageLevel,
+    context,
+    domains,
+    symptoms,
+  });
+
+  return c.json(report, 200, { 'Cache-Control': 'no-store' });
+});
+
+app.post('/api/feedback', async (c) => {
+  let body: Partial<FeedbackSubmission>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'Invalid JSON payload' }, 400);
+  }
+
+  const kind: FeedbackKind =
+    typeof body.kind === 'string' && FEEDBACK_KIND_SET.has(body.kind)
+      ? (body.kind as FeedbackKind)
+      : 'other';
+
+  const message =
+    typeof body.message === 'string' ? body.message.trim().slice(0, 1000) : '';
+  if (message.length < 3) {
+    return c.json({ error: 'Feedback message is too short' }, 400);
+  }
+
+  const contact =
+    typeof body.contact === 'string' && body.contact.trim().length > 0
+      ? body.contact.trim().slice(0, 120)
+      : null;
+
+  const contextJson =
+    body.context && typeof body.context === 'object'
+      ? JSON.stringify(body.context).slice(0, 1000)
+      : null;
+
+  const salt = c.env.HASH_SALT || 'default-dev-salt';
+  const ip =
+    c.req.header('cf-connecting-ip') ||
+    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+    '127.0.0.1';
+  const ipHash = await hashIpDaily(ip, salt);
+
+  if (c.env.APP_ENV === 'production') {
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    const recentCount = await c.env.DB.prepare(
+      'SELECT COUNT(*) as cnt FROM feedback WHERE ip_hash = ? AND created_at > ?',
+    )
+      .bind(ipHash, oneHourAgo)
+      .first<{ cnt: number }>();
+
+    if ((recentCount?.cnt ?? 0) >= 6) {
+      return c.json(
+        { error: 'Too many feedback messages. Please try again later.' },
+        429,
+      );
+    }
+  }
+
+  const result = await insertFeedback(c.env.DB, {
+    kind,
+    message,
+    contact,
+    contextJson,
+    ipHash,
+  });
+
+  return c.json(result, 200, { 'Cache-Control': 'no-store' });
+});
+
+app.all('*', async (c) => {
+  if (c.env.ASSETS) {
+    return c.env.ASSETS.fetch(c.req.raw);
+  }
+  return c.text('Not Found', 404);
+});
+
+export default app;
