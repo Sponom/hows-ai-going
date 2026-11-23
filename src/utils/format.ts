@@ -59,6 +59,28 @@ export function indexToColor(pct: number): string {
   return 'rgb(234, 179, 8)';
 }
 
+export const MIN_VISIBLE_COUNT = 100;
+
+/**
+ * Hides small raw counts (< 100) so early samples rely on signal-strength indicators;
+ * once a country/city/area reaches 100+ answers, formats cleanly (e.g. 142, 1.2K).
+ */
+export function formatVisibleCount(
+  count: number,
+  locale: Locale,
+  template: string,
+): string | null {
+  if (count < MIN_VISIBLE_COUNT) return null;
+  const formatted =
+    count >= 1000
+      ? new Intl.NumberFormat(locale, {
+          notation: 'compact',
+          maximumFractionDigits: 1,
+        }).format(count)
+      : count.toLocaleString(locale);
+  return template.replace('{n}', formatted);
+}
+
 export function formatTimeAgo(timestampMs: number, locale: Locale): string {
   const diffSec = Math.max(0, Math.floor((Date.now() - timestampMs) / 1000));
   try {

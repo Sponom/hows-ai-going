@@ -26,10 +26,12 @@ import type { MySavedLocation } from '../hooks/useRadar';
 import type { Dictionary, Locale } from '../i18n/translations';
 import {
   countryCodeToFlag,
+  formatVisibleCount,
   getCityDisplayName,
   getCountryName,
   indexToColor,
 } from '../utils/format';
+import { SignalBars } from './SignalBars';
 import { Tooltip } from './Tooltip';
 
 interface SidePanelProps {
@@ -235,9 +237,14 @@ export function SidePanel({
                       )}
                     </span>
                   </div>
-                  <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    {getCountryName(selectedCity.countryCode, locale)} ·{' '}
-                    {t.votesCount.replace('{n}', String(selectedCity.count))}
+                  <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    <span>{getCountryName(selectedCity.countryCode, locale)}</span>
+                    <span className="opacity-40">·</span>
+                    <SignalBars strength={selectedCity.strength} />
+                    <span>
+                      {formatVisibleCount(selectedCity.count, locale, t.votesCount) ??
+                        t.signalStrengthLabels[selectedCity.strength]}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -335,8 +342,14 @@ export function SidePanel({
                     <span>{countryCodeToFlag(selectedCountry)}</span>
                     <span>{getCountryName(selectedCountry, locale)}</span>
                   </div>
-                  <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    {t.votesCount.replace('{n}', String(countryStat?.count ?? 0))}
+                  <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    <SignalBars strength={countryStat?.strength ?? 0} />
+                    <span>
+                      {countryStat &&
+                      formatVisibleCount(countryStat.count, locale, t.votesCount)
+                        ? formatVisibleCount(countryStat.count, locale, t.votesCount)
+                        : t.signalStrengthLabels[countryStat?.strength ?? 0]}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -347,10 +360,7 @@ export function SidePanel({
                     {t.legendNoSignal}
                   </div>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {t.panelNeedsMoreSignals.replace(
-                      '{n}',
-                      String(APP_CONFIG.thresholds.country.preliminary),
-                    )}
+                    {t.panelCollectingData}
                   </p>
                   <button
                     type="button"
@@ -479,8 +489,12 @@ export function SidePanel({
                                 locale,
                               )}
                             </div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                              {t.votesCount.replace('{n}', String(city.count))}
+                            <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                              <SignalBars strength={city.strength} />
+                              <span>
+                                {formatVisibleCount(city.count, locale, t.votesCount) ??
+                                  t.signalStrengthLabels[city.strength]}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -493,8 +507,8 @@ export function SidePanel({
                               {city.aiUserShare}%
                             </span>
                           ) : (
-                            <span className="num-tabular rounded-md bg-sky-100 px-1.5 py-0.5 text-[11px] font-bold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
-                              {city.count}/{APP_CONFIG.thresholds.city.preliminary}
+                            <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                              {t.legendCalibrating}
                             </span>
                           )}
                           <ChevronRight className="h-3.5 w-3.5 text-slate-400 transition group-hover:translate-x-0.5" />
@@ -663,8 +677,8 @@ export function SidePanel({
                                       {c.stat.aiUserShare}%
                                     </span>
                                   ) : c.stat ? (
-                                    <span className="num-tabular rounded-lg bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
-                                      {c.stat.count}/{APP_CONFIG.thresholds.country.preliminary}
+                                    <span className="rounded-lg bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                                      {t.legendCalibrating}
                                     </span>
                                   ) : (
                                     <span className="text-xs text-slate-400">
@@ -713,8 +727,8 @@ export function SidePanel({
                                         {city.aiUserShare}%
                                       </span>
                                     ) : (
-                                      <span className="num-tabular text-xs font-semibold text-sky-600 dark:text-sky-400">
-                                        {city.count}/{APP_CONFIG.thresholds.city.preliminary}
+                                      <span className="text-xs font-semibold text-sky-600 dark:text-sky-400">
+                                        {t.legendCalibrating}
                                       </span>
                                     )}
                                   </button>
@@ -781,9 +795,15 @@ export function SidePanel({
                                       </span>
                                     )}
                                   </div>
-                                  <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                    {t.votesCount.replace('{n}', String(c.count))}
-                                    {cityCount > 0 ? ` · ${cityCount} 📍` : ''}
+                                  <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                    <SignalBars strength={c.strength} />
+                                    <span>
+                                      {formatVisibleCount(c.count, locale, t.votesCount) ??
+                                        t.signalStrengthLabels[c.strength]}
+                                    </span>
+                                    {cityCount > 0 && (
+                                      <span>· {cityCount} 📍</span>
+                                    )}
                                   </div>
                                 </div>
                                 {c.strength >= 2 ? (
@@ -794,8 +814,8 @@ export function SidePanel({
                                     {c.aiUserShare}%
                                   </span>
                                 ) : (
-                                  <span className="num-tabular rounded-lg bg-sky-100 px-2 py-1 text-xs font-bold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
-                                    {c.count}/{APP_CONFIG.thresholds.country.preliminary}
+                                  <span className="rounded-lg bg-sky-100 px-2 py-1 text-[11px] font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+                                    {t.legendCalibrating}
                                   </span>
                                 )}
                               </button>
@@ -835,8 +855,8 @@ export function SidePanel({
                                     {city.aiUserShare}%
                                   </span>
                                 ) : (
-                                  <span className="num-tabular text-xs font-semibold text-sky-600 dark:text-sky-400">
-                                    {city.count}/{APP_CONFIG.thresholds.city.preliminary}
+                                  <span className="text-xs font-semibold text-sky-600 dark:text-sky-400">
+                                    {t.legendCalibrating}
                                   </span>
                                 )}
                               </button>
@@ -906,9 +926,11 @@ export function SidePanel({
                             }}
                           />
                         </div>
-                        <div className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                          {t.votesCount.replace('{n}', String(r.count))}
-                        </div>
+                        {formatVisibleCount(r.count, locale, t.votesCount) && (
+                          <div className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                            {formatVisibleCount(r.count, locale, t.votesCount)}
+                          </div>
+                        )}
                       </button>
                     );
                   })}
@@ -1025,25 +1047,24 @@ function CalibrationCard({
   t: Dictionary;
   onOpenSurvey: () => void;
 }) {
-  const remaining = Math.max(0, target - current);
   const pct = Math.min(100, Math.round((current / target) * 100));
 
   return (
     <div className="mt-4 rounded-2xl border border-sky-400/40 bg-sky-50 p-4 dark:bg-sky-950/25">
       <div className="flex items-center justify-between text-xs font-bold text-sky-700 dark:text-sky-300">
-        <span>{t.legendCalibrating}</span>
-        <span className="num-tabular">
-          {current} / {target}
+        <span className="inline-flex items-center gap-1.5">
+          <SignalBars strength={1} />
+          <span>{t.legendCalibrating}</span>
         </span>
       </div>
-      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-sky-200/70 dark:bg-slate-800">
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-sky-200/70 dark:bg-slate-800">
         <div
           className="h-full rounded-full bg-sky-500 transition-all"
           style={{ width: `${pct}%` }}
         />
       </div>
       <p className="mt-2.5 text-xs text-slate-600 dark:text-slate-300">
-        {t.panelNeedsMoreSignals.replace('{n}', String(remaining))}
+        {t.panelCollectingData}
       </p>
       <button
         type="button"

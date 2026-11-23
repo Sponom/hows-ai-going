@@ -6,7 +6,6 @@ import { feature } from 'topojson-client';
 import worldAtlas from 'world-atlas/countries-50m.json';
 import disputedAreas from '../data/disputed-areas.json';
 import { Check, ChevronDown, ChevronsLeftRight, Globe, Minus, Plus } from 'lucide-react';
-import { APP_CONFIG } from '../../shared/config';
 import { NUMERIC_TO_ALPHA2 } from '../../shared/geo-codes';
 import {
   HISTORY_PERIODS,
@@ -18,6 +17,7 @@ import type { MySavedLocation } from '../hooks/useRadar';
 import type { Dictionary, Locale } from '../i18n/translations';
 import {
   countryCodeToFlag,
+  formatVisibleCount,
   getCityDisplayName,
   getCountryName,
   indexToColor,
@@ -495,14 +495,15 @@ export function WorldRadarMap({
               interactive
                 ? (e) => {
                     e.stopPropagation();
-                    const remaining = Math.max(
-                      0,
-                      APP_CONFIG.thresholds.city.preliminary - city.count,
+                    const visibleCount = formatVisibleCount(
+                      city.count,
+                      locale,
+                      t.votesCount,
                     );
                     const subtitle =
                       city.strength === 1
-                        ? t.panelNeedsMoreSignals.replace('{n}', String(remaining))
-                        : `${getCountryName(city.countryCode, locale)} · ${t.votesCount.replace('{n}', String(city.count))}`;
+                        ? `${getCountryName(city.countryCode, locale)} · ${t.legendCalibrating}`
+                        : `${getCountryName(city.countryCode, locale)} · ${visibleCount ?? t.signalStrengthLabels[city.strength]}`;
                     updatePointerPos(e, {
                       title: getCityDisplayName(
                         city.cityName,
@@ -697,23 +698,15 @@ export function WorldRadarMap({
                     const name = getCountryName(alpha2, locale);
                     const displayStat = isHistorical ? pastStat : stat;
                     const strength = displayStat?.strength ?? 0;
-                    const remaining = Math.max(
-                      0,
-                      APP_CONFIG.thresholds.country.preliminary -
-                        (displayStat?.count ?? 0),
-                    );
+                    const visibleCount = displayStat
+                      ? formatVisibleCount(displayStat.count, locale, t.votesCount)
+                      : null;
                     const subtitle =
                       strength === 0
                         ? t.legendNoSignal
                         : strength === 1
-                          ? t.panelNeedsMoreSignals.replace(
-                              '{n}',
-                              String(remaining),
-                            )
-                          : t.votesCount.replace(
-                              '{n}',
-                              String(displayStat?.count ?? 0),
-                            );
+                          ? t.legendCalibrating
+                          : visibleCount ?? t.signalStrengthLabels[strength];
 
                     updatePointerPos(e, {
                       title: name,

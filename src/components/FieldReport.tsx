@@ -6,6 +6,7 @@ import { useAnimatedModal } from '../hooks/useAnimatedModal';
 import type { Dictionary, Locale } from '../i18n/translations';
 import {
   countryCodeToFlag,
+  formatVisibleCount,
   getCityDisplayName,
   getCountryName,
 } from '../utils/format';
@@ -199,7 +200,6 @@ export function FieldReport({
   const countryIsCalibrated = Boolean(countryStat && countryStat.strength >= 2);
   const countryVotes = countryStat?.count ?? 1;
   const countryTarget = milestones.countryThreshold;
-  const countryRemaining = Math.max(0, countryTarget - countryVotes);
   const countryProgressPct = Math.min(
     100,
     Math.round((countryVotes / countryTarget) * 100),
@@ -354,6 +354,7 @@ export function FieldReport({
                     label={countryName}
                     pct={countryStat.aiUserShare}
                     count={countryStat.count}
+                    locale={locale}
                     t={t}
                   />
                 ) : (
@@ -363,9 +364,9 @@ export function FieldReport({
                         <span>{countryCodeToFlag(signal.countryCode)}</span>
                         <span>{countryName}</span>
                       </span>
-                      <span className="num-tabular inline-flex items-center gap-1 font-bold text-sky-600 dark:text-sky-400">
+                      <span className="inline-flex items-center gap-1 font-bold text-sky-600 dark:text-sky-400">
                         <Lock className="h-3 w-3" />
-                        {countryVotes} / {countryTarget}
+                        {t.legendCalibrating}
                       </span>
                     </div>
                     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
@@ -375,7 +376,7 @@ export function FieldReport({
                       />
                     </div>
                     <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                      {t.reportUnlockShort.replace('{n}', String(countryRemaining))}
+                      {t.reportCollectingCountry}
                     </p>
                   </div>
                 )}
@@ -389,6 +390,7 @@ export function FieldReport({
                     label={t.roleLabels[signal.role]}
                     pct={comparison.role.aiUserShare}
                     count={comparison.role.count}
+                    locale={locale}
                     t={t}
                   />
                 </div>
@@ -442,15 +444,18 @@ function OutOfTenRow({
   label,
   pct,
   count,
+  locale,
   t,
 }: {
   icon: string;
   label: string;
   pct: number;
   count: number;
+  locale: Locale;
   t: Dictionary;
 }) {
   const filledDots = Math.round(pct / 10);
+  const visibleCount = formatVisibleCount(count, locale, t.votesCount);
 
   return (
     <div>
@@ -479,7 +484,7 @@ function OutOfTenRow({
           ))}
         </div>
         <span className="num-tabular text-[11px] text-slate-400 dark:text-slate-500">
-          {pct}% · {t.votesCount.replace('{n}', String(count))}
+          {pct}%{visibleCount ? ` · ${visibleCount}` : ''}
         </span>
       </div>
     </div>

@@ -79,6 +79,7 @@ export interface Dictionary {
   panelCasesGroupAi: string;
   panelCasesGroupNoAi: string;
   panelNeedsMoreSignals: string;
+  panelCollectingData: string;
   panelCompareYourself: string;
   surveyTitle: string;
   surveySubtitle: string;
@@ -123,6 +124,7 @@ export interface Dictionary {
   reportAroundYou: string;
   reportOutOfTen: string; // "{n} in 10 use AI"
   reportUnlockShort: string; // "{n} more people to unlock {country} on the map"
+  reportCollectingCountry: string;
   reportCompareHigher: string;
   reportCompareMatch: string;
   reportCompareLower: string;
@@ -313,6 +315,7 @@ const EN: Dictionary = {
   panelCasesGroupAi: 'What people use AI for',
   panelCasesGroupNoAi: 'Why people skip AI',
   panelNeedsMoreSignals: '{n} more answers needed to unlock score',
+  panelCollectingData: 'Collecting enough answers to unlock the score here.',
   panelCompareYourself: 'And you? Add your anonymous answer',
   surveyTitle: 'How’s AI going for you?',
   surveySubtitle: 'Anonymous · No sign-up',
@@ -357,6 +360,7 @@ const EN: Dictionary = {
   reportAroundYou: 'How others compare',
   reportOutOfTen: '{n} in 10 respondents use AI',
   reportUnlockShort: '{n} more locals needed to unlock this country',
+  reportCollectingCountry: 'Collecting local answers to unlock this country.',
   reportCompareHigher: 'You use AI more often than most people here.',
   reportCompareMatch: 'You’re right in line with the majority here.',
   reportCompareLower: 'You’re holding out more than most people here.',
@@ -562,6 +566,7 @@ const RU: Dictionary = {
   panelCasesGroupAi: 'Для чего используют AI',
   panelCasesGroupNoAi: 'Почему обходятся без AI',
   panelNeedsMoreSignals: 'Нужно ещё {n} ответов, чтобы открыть рейтинг',
+  panelCollectingData: 'Собираем достаточно ответов, чтобы открыть статистику.',
   panelCompareYourself: 'А как у тебя с ИИ? Добавить свой ответ',
   surveyTitle: 'Как у тебя с ИИ?',
   surveySubtitle: 'Анонимно · Без регистрации',
@@ -606,6 +611,7 @@ const RU: Dictionary = {
   reportAroundYou: 'А как у других',
   reportOutOfTen: '{n} из 10 ответивших с AI',
   reportUnlockShort: 'Ещё {n} чел. — и откроется статистика страны',
+  reportCollectingCountry: 'Собираем ответы, чтобы открыть статистику страны.',
   reportCompareHigher: 'Ты пользуешься ИИ чаще большинства здесь.',
   reportCompareMatch: 'Ты прямо на одной волне с большинством.',
   reportCompareLower: 'Ты держишься без ИИ стойче, чем большинство здесь.',
