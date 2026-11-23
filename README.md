@@ -1,45 +1,45 @@
 # How’s AI Going?
 
-Анонимная живая карта использования ИИ по всему миру: как обычные люди реально используют искусственный интеллект в работе и повседневной жизни (или обходятся без него), плюс сравнение «тогда и сейчас» за последние 12 месяцев.
+An anonymous live global map showing how everyday people around the world actually use AI across work and daily life — or choose not to — with a 12-month "then & now" comparison.
 
-## Быстрый локальный старт
+## Local Development
 
 ```bash
-# 1. Установить зависимости
+# 1. Install dependencies
 pnpm install
 
-# 2. Создать локальную SQLite D1 базу и применить миграции (0001–0004)
+# 2. Create local SQLite D1 database and apply migrations (0001–0004)
 pnpm db:migrate:local
 
-# 3. Заполнить локальную базу стартовыми данными с 12-месячной историей
+# 3. Seed local database with baseline data & 12-month history
 pnpm db:seed:local
 
-# 4. Запустить веб-приложение (Vite :5173 + Cloudflare Worker API :8787)
+# 4. Run frontend (Vite :5173) + Cloudflare Worker API (:8787)
 pnpm dev
 ```
 
-Открыть в браузере: `http://localhost:5173`
+Open `http://localhost:5173` in your browser.
 
-Сбросить локальную базу обратно в чистый ноль:
+Reset the local D1 database to an empty state:
 ```bash
 pnpm db:reset:local
 ```
 
-## Деплой на Cloudflare Workers
+## Deploy to Cloudflare Workers
 
 ```bash
-# 1. Авторизоваться в Wrangler (один раз)
+# 1. Sign in to Cloudflare (one-time)
 npx wrangler login
 
-# 2. Задать продовую соль для хеширования анонимных токенов и IP (один раз)
+# 2. Set production hash salt for anonymous tokens & daily IP hashes (one-time)
 npx wrangler secret put HASH_SALT
 
-# 3. Собрать и задеплоить Worker + статику
+# 3. Build and deploy Worker + static assets
 pnpm deploy
 ```
 
-Тестовый домен: `https://hows-ai-going.sponom.workers.dev`
+Staging URL: `https://hows-ai-going.sponom.workers.dev`
 
-## Документация
-- [docs/CONCEPT.md](./docs/CONCEPT.md) — продуктовый концепт, сферы, кейсы и бэклог.
-- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — архитектура Cloudflare Workers + D1, аналитика и чтение фидбека.
+## Documentation
+- [docs/CONCEPT.md](./docs/CONCEPT.md) — product concept, taxonomy, and backlog.
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — Cloudflare Workers + D1 architecture, analytics, and feedback queries.
