@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
   ArrowRight,
@@ -77,7 +78,14 @@ export function SurveyModal({
   const [cityInput, setCityInput] = useState<string>('');
   const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
   const [countryQuery, setCountryQuery] = useState('');
+  const [dropdownRect, setDropdownRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
   const countryDropdownRef = useRef<HTMLDivElement | null>(null);
+  const countryMenuRef = useRef<HTMLDivElement | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -99,17 +107,43 @@ export function SurveyModal({
   }, [open, countryDropdownOpen, view, onClose]);
 
   useEffect(() => {
-    if (!countryDropdownOpen) return;
+    if (!countryDropdownOpen) {
+      setDropdownRect(null);
+      return;
+    }
+
+    const updateRect = () => {
+      const el = countryDropdownRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const top = rect.bottom + 6;
+      const available = Math.max(160, window.innerHeight - top - 16);
+      setDropdownRect({
+        top,
+        left: rect.left,
+        width: rect.width,
+        maxHeight: Math.min(320, available),
+      });
+    };
+
+    updateRect();
     const onPointerDown = (e: MouseEvent) => {
+      const target = e.target as Node;
       if (
-        countryDropdownRef.current &&
-        !countryDropdownRef.current.contains(e.target as Node)
+        !countryDropdownRef.current?.contains(target) &&
+        !countryMenuRef.current?.contains(target)
       ) {
         setCountryDropdownOpen(false);
       }
     };
+    window.addEventListener('resize', updateRect);
+    window.addEventListener('scroll', updateRect, true);
     document.addEventListener('mousedown', onPointerDown);
-    return () => document.removeEventListener('mousedown', onPointerDown);
+    return () => {
+      window.removeEventListener('resize', updateRect);
+      window.removeEventListener('scroll', updateRect, true);
+      document.removeEventListener('mousedown', onPointerDown);
+    };
   }, [countryDropdownOpen]);
 
   // Pre-fill existing answers when opening the modal to edit profile
@@ -443,59 +477,75 @@ export function SurveyModal({
                   />
                 </button>
 
-                {countryDropdownOpen && (
-                  <div className="absolute inset-x-0 top-[70px] z-30 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-[#0d1424]">
-                    <div className="border-b border-slate-100 p-2 dark:border-slate-800">
-                      <div className="relative">
-                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="text"
-                          autoFocus
-                          value={countryQuery}
-                          onChange={(e) => setCountryQuery(e.target.value)}
-                          placeholder={t.panelSearchPlaceholder}
-                          className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-sky-500 focus:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                        />
-                      </div>
-                    </div>
-                    <div role="listbox" className="max-h-52 space-y-1 overflow-y-auto p-1.5">
-                      {filteredCountries.length === 0 ? (
-                        <div className="py-4 text-center text-xs text-slate-400">
-                          {t.panelSearchNoResults}
+                {countryDropdownOpen &&
+                  dropdownRect &&
+                  createPortal(
+                    <div
+                      ref={countryMenuRef}
+                      style={{
+                        position: 'fixed',
+                        top: dropdownRect.top,
+                        left: dropdownRect.left,
+                        width: dropdownRect.width,
+                      }}
+                      className="z-[70] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-[#0d1424]"
+                    >
+                      <div className="border-b border-slate-100 p-2 dark:border-slate-800">
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            autoFocus
+                            value={countryQuery}
+                            onChange={(e) => setCountryQuery(e.target.value)}
+                            placeholder={t.panelSearchPlaceholder}
+                            className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-sky-500 focus:bg-white dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder-slate-500 dark:focus:border-sky-500 dark:focus:bg-slate-800"
+                          />
                         </div>
-                      ) : (
-                        filteredCountries.map((c) => {
-                          const selected = c.code === countryCode;
-                          return (
-                            <button
-                              key={c.code}
-                              type="button"
-                              role="option"
-                              aria-selected={selected}
-                              onClick={() => {
-                                setCountryCode(c.code);
-                                clearCity();
-                                setCountryDropdownOpen(false);
-                                setCountryQuery('');
-                              }}
-                              className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-medium transition ${
-                                selected
-                                  ? 'bg-sky-50 font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300'
-                                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
-                              }`}
-                            >
-                              <span className="flex items-center gap-2 truncate">
-                                <span>{countryCodeToFlag(c.code)}</span>
-                                <span className="truncate">{c.name}</span>
-                              </span>
-                              {selected && <Check className="h-3.5 w-3.5 shrink-0" />}
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
+                      </div>
+                      <div
+                        role="listbox"
+                        style={{ maxHeight: Math.max(120, dropdownRect.maxHeight - 54) }}
+                        className="space-y-1 overflow-y-auto p-1.5"
+                      >
+                        {filteredCountries.length === 0 ? (
+                          <div className="py-4 text-center text-xs text-slate-400">
+                            {t.panelSearchNoResults}
+                          </div>
+                        ) : (
+                          filteredCountries.map((c) => {
+                            const selected = c.code === countryCode;
+                            return (
+                              <button
+                                key={c.code}
+                                type="button"
+                                role="option"
+                                aria-selected={selected}
+                                onClick={() => {
+                                  setCountryCode(c.code);
+                                  clearCity();
+                                  setCountryDropdownOpen(false);
+                                  setCountryQuery('');
+                                }}
+                                className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-medium transition ${
+                                  selected
+                                    ? 'bg-sky-50 font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300'
+                                    : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                                }`}
+                              >
+                                <span className="flex items-center gap-2 truncate">
+                                  <span>{countryCodeToFlag(c.code)}</span>
+                                  <span className="truncate">{c.name}</span>
+                                </span>
+                                {selected && <Check className="h-3.5 w-3.5 shrink-0" />}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>,
+                    document.body,
+                  )}
               </div>
 
               {/* City selector (optional) */}
