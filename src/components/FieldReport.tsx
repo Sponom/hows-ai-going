@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Compass, Lock, Pencil, Share2, Sparkles, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { CheckCircle2, Compass, Lock, Pencil, Share2, Sparkles, X } from 'lucide-react';
 import { LEVEL_META, ROLE_ICONS, SYMPTOM_ICONS } from '../../shared/taxonomy';
 import type { FieldReportResponse } from '../../shared/types';
 import { useAnimatedModal } from '../hooks/useAnimatedModal';
@@ -13,11 +13,107 @@ import { Tooltip } from './Tooltip';
 
 interface FieldReportProps {
   report: FieldReportResponse | null;
+  justSubmitted?: boolean;
   onClose: () => void;
   onEdit: () => void;
   onShare: (countryCode: string) => void;
   locale: Locale;
   t: Dictionary;
+}
+
+const CONFETTI_COLORS = ['#4f46e5', '#0891b2', '#10b981', '#eab308', '#38bdf8'];
+
+function CelebrationConfetti({ active }: { active: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    ctx.scale(dpr, dpr);
+
+    const originX = w / 2;
+    const originY = Math.min(h * 0.36, 280);
+
+    const particles = Array.from({ length: 54 }, () => {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.9;
+      const speed = 4.5 + Math.random() * 7.5;
+      return {
+        x: originX + (Math.random() - 0.5) * 40,
+        y: originY + (Math.random() - 0.5) * 20,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 1.5,
+        size: 5 + Math.random() * 4.5,
+        rot: Math.random() * Math.PI * 2,
+        vrot: (Math.random() - 0.5) * 0.24,
+        color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+        isCircle: Math.random() < 0.3,
+      };
+    });
+
+    const start = performance.now();
+    const duration = 1800;
+    let rafId = 0;
+
+    const tick = (now: number) => {
+      const elapsed = now - start;
+      const progress = Math.min(1, elapsed / duration);
+      ctx.clearRect(0, 0, w, h);
+
+      const alpha = progress > 0.65 ? Math.max(0, 1 - (progress - 0.65) / 0.35) : 1;
+      ctx.globalAlpha = alpha;
+
+      for (const p of particles) {
+        p.vx *= 0.985;
+        p.vy = p.vy * 0.985 + 0.22;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rot += p.vrot;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.color;
+        if (p.isCircle) {
+          ctx.beginPath();
+          ctx.arc(0, 0, p.size * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillRect(-p.size / 2, -p.size * 0.3, p.size, p.size * 0.6);
+        }
+        ctx.restore();
+      }
+
+      if (progress < 1) {
+        rafId = requestAnimationFrame(tick);
+      } else {
+        ctx.clearRect(0, 0, w, h);
+      }
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [active]);
+
+  if (!active) return null;
+
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 z-[60] h-full w-full"
+    />
+  );
 }
 
 const LEVEL_STEP_COLORS: Record<0 | 1 | 2 | 3, string> = {
@@ -55,6 +151,7 @@ const LEVEL_ACCENTS: Record<
 
 export function FieldReport({
   report,
+  justSubmitted = false,
   onClose,
   onEdit,
   onShare,
@@ -109,14 +206,16 @@ export function FieldReport({
   );
 
   return (
-    <div
-      className={`${
-        closing ? 'animate-modal-backdrop-out pointer-events-none' : 'animate-modal-backdrop'
-      } fixed inset-0 z-50 flex items-end justify-center bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:p-4`}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <>
+      <CelebrationConfetti active={Boolean(report && justSubmitted)} />
+      <div
+        className={`${
+          closing ? 'animate-modal-backdrop-out pointer-events-none' : 'animate-modal-backdrop'
+        } fixed inset-0 z-50 flex items-end justify-center bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:p-4`}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
       <div
         role="dialog"
         aria-modal="true"
@@ -127,12 +226,22 @@ export function FieldReport({
       >
         {/* Top bar */}
         <div className="flex items-center justify-between px-5 pt-4 pb-2">
-          <span
-            id="field-report-title"
-            className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500"
-          >
-            {t.reportTitle}
-          </span>
+          {justSubmitted ? (
+            <span
+              id="field-report-title"
+              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/12 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>{t.reportThanksTitle}</span>
+            </span>
+          ) : (
+            <span
+              id="field-report-title"
+              className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500"
+            >
+              {t.reportTitle}
+            </span>
+          )}
           <Tooltip label={t.a11yClose} side="left">
             <button
               type="button"
@@ -319,7 +428,8 @@ export function FieldReport({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

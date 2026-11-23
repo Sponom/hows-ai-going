@@ -55,14 +55,13 @@ function parseSymptoms(raw: string): SymptomId[] {
 }
 
 function parseDomains(rawDomains: string | null, fallbackRole: string): RoleId[] {
-  if (rawDomains) {
+  if (rawDomains !== null) {
     try {
       const parsed = JSON.parse(rawDomains);
       if (Array.isArray(parsed)) {
-        const valid = parsed.filter(
+        return parsed.filter(
           (d): d is RoleId => typeof d === 'string' && ROLE_SET.has(d),
         );
-        if (valid.length > 0) return valid;
       }
     } catch {
       // fallback below
@@ -371,7 +370,7 @@ export async function buildRadarSnapshot(
       lng: row.lng,
       level: Math.max(0, Math.min(3, Number(row.level))) as UsageLevel,
       context: (row.context as UsageContext) || 'none',
-      role: domains[0],
+      role: domains[0] ?? null,
       domains,
       symptom: syms[0] ?? null,
       createdAt: row.updated_at,
@@ -524,7 +523,9 @@ export async function upsertSignal(
   const city = cityKey
     ? snapshot.cities.find((c) => c.key === cityKey) ?? null
     : null;
-  const roleStat = snapshot.roles.find((r) => r.role === primaryRole) ?? null;
+  const roleStat = params.domains[0]
+    ? snapshot.roles.find((r) => r.role === params.domains[0]) ?? null
+    : null;
 
   const countryCount = country?.count ?? 1;
   const cityCount = city?.count ?? (params.cityName ? 1 : 0);

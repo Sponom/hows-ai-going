@@ -7,7 +7,6 @@ import {
   Search,
   Share2,
   Sparkles,
-  Users,
   X,
 } from 'lucide-react';
 import { APP_CONFIG } from '../../shared/config';
@@ -526,43 +525,30 @@ export function SidePanel({
                 </button>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <div
                   title={t.summaryCoverageTooltip}
-                  className="rounded-xl border border-slate-200/80 bg-slate-50/90 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-900/60"
+                  className="rounded-xl border border-slate-200/80 bg-slate-50/90 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/60"
                 >
-                  <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                    <Globe2 className="h-3 w-3 shrink-0 text-sky-500" aria-hidden="true" />
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    <Globe2 className="h-3.5 w-3.5 shrink-0 text-sky-500" aria-hidden="true" />
                     <span className="truncate">{t.summaryCoverageTitle}</span>
                   </div>
-                  <div className="num-tabular mt-0.5 text-sm font-extrabold leading-tight text-slate-900 dark:text-white">
+                  <div className="num-tabular mt-0.5 text-base font-extrabold leading-tight text-slate-900 dark:text-white">
                     {snapshot ? snapshot.global.countriesReached : '—'}
-                    <span className="text-[11px] font-normal text-slate-400">
+                    <span className="text-xs font-normal text-slate-400">
                       /{APP_CONFIG.totalCountriesTarget}
                     </span>
                   </div>
                 </div>
 
                 <div
-                  title={t.summaryAnswersTooltip}
-                  className="rounded-xl border border-slate-200/80 bg-slate-50/90 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-900/60"
-                >
-                  <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                    <Users className="h-3 w-3 shrink-0 text-slate-400" aria-hidden="true" />
-                    <span className="truncate">{t.summaryAnswersTitle}</span>
-                  </div>
-                  <div className="num-tabular mt-0.5 text-sm font-extrabold leading-tight text-slate-900 dark:text-white">
-                    {snapshot ? snapshot.global.totalSignals.toLocaleString() : '—'}
-                  </div>
-                </div>
-
-                <div
                   title={t.summaryUsingAiTooltip}
-                  className="rounded-xl border border-slate-200/80 bg-slate-50/90 px-2.5 py-2 dark:border-slate-800 dark:bg-slate-900/60"
+                  className="rounded-xl border border-slate-200/80 bg-slate-50/90 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/60"
                 >
-                  <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                     <Sparkles
-                      className="h-3 w-3 shrink-0"
+                      className="h-3.5 w-3.5 shrink-0"
                       style={{
                         color:
                           snapshot?.global.globalAiUserShare !== null &&
@@ -575,7 +561,7 @@ export function SidePanel({
                     <span className="truncate">{t.summaryUsingAiTitle}</span>
                   </div>
                   <div
-                    className="num-tabular mt-0.5 text-sm font-extrabold leading-tight"
+                    className="num-tabular mt-0.5 text-base font-extrabold leading-tight"
                     style={{
                       color:
                         snapshot?.global.globalAiUserShare !== null &&

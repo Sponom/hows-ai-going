@@ -138,10 +138,6 @@ app.post('/api/signal', async (c) => {
     ),
   ).slice(0, 5);
 
-  if (domains.length === 0) {
-    return c.json({ error: 'Select at least 1 area' }, 400);
-  }
-
   const context: UsageContext =
     level === 0
       ? 'none'

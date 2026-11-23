@@ -48,6 +48,7 @@ export interface Dictionary {
   legendNoSignalShort: string;
   legendCalibrating: string;
   legendCalibratingShort: string;
+  legendCities: string;
   legendScaleLabel: string;
   legendLow: string;
   legendHigh: string;
@@ -107,7 +108,11 @@ export interface Dictionary {
   surveySubmitting: string;
   surveyNext: string;
   surveyBack: string;
+  surveyAddDetails: string;
+  surveyDetailsHint: string;
+  surveyChangeLocation: string;
   reportTitle: string;
+  reportThanksTitle: string;
   reportFirstCity: string;
   reportFirstCountry: string;
   reportCountryCollectingTitle: string; // "{country}: collecting votes ({cur} of {target})"
@@ -272,6 +277,7 @@ const EN: Dictionary = {
   legendNoSignalShort: 'None',
   legendCalibrating: 'Low data',
   legendCalibratingShort: 'Low',
+  legendCities: 'Cities',
   legendScaleLabel: 'Use AI:',
   legendLow: '0%',
   legendHigh: '100%',
@@ -336,7 +342,11 @@ const EN: Dictionary = {
   surveySubmitting: 'Saving...',
   surveyNext: 'Next',
   surveyBack: 'Back',
+  surveyAddDetails: 'Add details',
+  surveyDetailsHint: 'Optional — powers the Areas & Use cases filters on the map',
+  surveyChangeLocation: 'Change',
   reportTitle: 'Your answer',
+  reportThanksTitle: 'Thanks! You’re on the map',
   reportFirstCity: 'FIRST FROM {city}!',
   reportFirstCountry: 'FIRST FROM {country}!',
   reportCountryCollectingTitle: '{country} — low data ({cur} of {target})',
@@ -516,6 +526,7 @@ const RU: Dictionary = {
   legendNoSignalShort: 'Нет',
   legendCalibrating: 'Мало данных',
   legendCalibratingShort: 'Мало',
+  legendCities: 'Города',
   legendScaleLabel: 'С ИИ:',
   legendLow: '0%',
   legendHigh: '100%',
@@ -580,7 +591,11 @@ const RU: Dictionary = {
   surveySubmitting: 'Сохраняем...',
   surveyNext: 'Дальше',
   surveyBack: 'Назад',
+  surveyAddDetails: 'Уточнить детали',
+  surveyDetailsHint: 'Необязательно — помогает фильтровать карту по сферам и задачам',
+  surveyChangeLocation: 'Изменить',
   reportTitle: 'Твой ответ',
+  reportThanksTitle: 'Спасибо! Твой ответ на карте',
   reportFirstCity: 'ПЕРВЫЙ ОТВЕТ ИЗ ГОРОДА {city}!',
   reportFirstCountry: 'ПЕРВЫЙ ОТВЕТ ИЗ СТРАНЫ {country}!',
   reportCountryCollectingTitle: '{country} — мало данных ({cur} из {target})',

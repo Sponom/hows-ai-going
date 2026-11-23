@@ -102,6 +102,7 @@ export default function App() {
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
   const [desktopPanelOpen, setDesktopPanelOpen] = useState(true);
   const [report, setReport] = useState<FieldReportResponse | null>(null);
+  const [reportJustSubmitted, setReportJustSubmitted] = useState(false);
 
   const t = getDictionary(locale);
   const {
@@ -202,9 +203,11 @@ export default function App() {
       const city = cityKey
         ? current?.cities.find((c) => c.key === cityKey) ?? null
         : null;
-      const roleStat =
-        current?.roles.find((r) => r.role === myProfile.role) ?? null;
+      const roleStat = myProfile.domains[0]
+        ? current?.roles.find((r) => r.role === myProfile.domains[0]) ?? null
+        : null;
 
+      setReportJustSubmitted(false);
       setReport({
         ok: true,
         updated: true,
@@ -282,6 +285,7 @@ export default function App() {
     const res = await submitSignal(payload);
     setCompareOpen(false);
     setSurveyOpen(false);
+    setReportJustSubmitted(true);
     setReport(res);
     setSelectedCountry(res.signal.countryCode);
     setSelectedCity(null);
@@ -517,7 +521,7 @@ export default function App() {
                 {t.legendScaleLabel}
               </span>
               <span className="flex items-center gap-1" title={t.legendNoSignal}>
-                <span className="h-2.5 w-2.5 shrink-0 rounded border border-slate-300 bg-[#dde5f0] dark:border-slate-700 dark:bg-[#121b2d]" />
+                <span className="h-2.5 w-2.5 shrink-0 rounded border border-slate-300 bg-[#f8fafc] dark:border-slate-700 dark:bg-[#121b2d]" />
                 <span className="sm:hidden">{t.legendNoSignalShort}</span>
                 <span className="hidden sm:inline">{t.legendNoSignal}</span>
               </span>
@@ -525,22 +529,34 @@ export default function App() {
                 className="flex items-center gap-1"
                 title={t.legendCalibrating}
               >
-                <span className="h-2.5 w-2.5 shrink-0 rounded border border-sky-400/60 bg-sky-200/70 dark:bg-sky-500/25" />
+                <span className="h-2.5 w-2.5 shrink-0 rounded border border-sky-400/60 bg-sky-100 dark:bg-sky-500/25" />
                 <span className="sm:hidden">{t.legendCalibratingShort}</span>
                 <span className="hidden sm:inline">{t.legendCalibrating}</span>
+              </span>
+              <span
+                className="hidden items-center gap-1.5 sm:flex"
+                title={t.legendCities}
+              >
+                <span className="relative flex h-2.5 w-2.5 shrink-0 items-center justify-center">
+                  <span className="absolute h-2.5 w-2.5 rounded-full border border-emerald-500/50" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                </span>
+                <span>{t.legendCities}</span>
               </span>
               <span className="flex items-center gap-1.5 border-l border-slate-200 pl-2 dark:border-slate-700/80 sm:pl-2.5">
                 <span className="text-indigo-600 dark:text-indigo-400">
                   {t.legendLow}
                 </span>
                 <span
-                  className="h-2 w-10 shrink-0 rounded-full sm:w-16"
+                  className="flex items-center gap-1"
                   title={`${t.legendScaleLabel} ${t.legendLow} → ${t.legendHigh}`}
-                  style={{
-                    background:
-                      'linear-gradient(90deg, #4f46e5 0%, #0891b2 35%, #10b981 70%, #eab308 100%)',
-                  }}
-                />
+                  aria-hidden="true"
+                >
+                  <span className="h-2.5 w-2.5 rounded-[3px] bg-[#4f46e5]" />
+                  <span className="h-2.5 w-2.5 rounded-[3px] bg-[#0891b2]" />
+                  <span className="h-2.5 w-2.5 rounded-[3px] bg-[#10b981]" />
+                  <span className="h-2.5 w-2.5 rounded-[3px] bg-[#eab308]" />
+                </span>
                 <span className="text-amber-600 dark:text-yellow-400">
                   {t.legendHigh}
                 </span>
@@ -581,9 +597,14 @@ export default function App() {
 
       <FieldReport
         report={report}
-        onClose={() => setReport(null)}
+        justSubmitted={reportJustSubmitted}
+        onClose={() => {
+          setReport(null);
+          setReportJustSubmitted(false);
+        }}
         onEdit={() => {
           setReport(null);
+          setReportJustSubmitted(false);
           setSurveyOpen(true);
         }}
         onShare={(countryCode) => openShareModal({ countryCode })}

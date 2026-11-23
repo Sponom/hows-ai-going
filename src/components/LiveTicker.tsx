@@ -36,7 +36,7 @@ export function LiveTicker({ recent, locale, t }: LiveTickerProps) {
         {t.tickerLive}
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_24px,black_calc(100%-24px),transparent)]">
         <div className="ticker-track">
           {items.map((sig, i) => {
             const place = sig.cityName
@@ -58,10 +58,14 @@ export function LiveTicker({ recent, locale, t }: LiveTickerProps) {
                 <span className="font-semibold text-slate-800 dark:text-slate-100">
                   {place}
                 </span>
-                <span className="text-slate-300 dark:text-slate-700">·</span>
-                <span className="text-slate-500 dark:text-slate-400">
-                  {ROLE_ICONS[sig.role]} {t.roleLabels[sig.role]}
-                </span>
+                {sig.role && (
+                  <>
+                    <span className="text-slate-300 dark:text-slate-700">·</span>
+                    <span className="text-slate-500 dark:text-slate-400">
+                      {ROLE_ICONS[sig.role]} {t.roleLabels[sig.role]}
+                    </span>
+                  </>
+                )}
                 <span className="text-slate-300 dark:text-slate-700">·</span>
                 <span>{LEVEL_META[sig.level].emoji}</span>
                 <span className="text-slate-700 dark:text-slate-200">{symptomTitle}</span>

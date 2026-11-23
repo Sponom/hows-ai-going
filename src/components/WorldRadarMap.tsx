@@ -68,6 +68,20 @@ const WIDTH = 1040;
 const HEIGHT = 520;
 const MAX_ZOOM = 24;
 
+function formatPeriodDate(period: HistoryPeriod, locale: Locale): string {
+  const d = new Date();
+  const monthsBack =
+    period === '12m' ? 12 : period === '6m' ? 6 : period === '3m' ? 3 : 0;
+  d.setDate(1);
+  d.setMonth(d.getMonth() - monthsBack);
+  return new Intl.DateTimeFormat(locale, {
+    month: 'short',
+    year: 'numeric',
+  })
+    .format(d)
+    .replace(/\s*г\.?$/i, '');
+}
+
 function formatCountriesShort(
   n: number,
   locale: Locale,
@@ -407,14 +421,14 @@ export function WorldRadarMap({
     const isSelected = Boolean(alpha2 && selectedCountry === alpha2);
     const isMyCountry = Boolean(alpha2 && myLocation?.countryCode === alpha2);
 
-    let fill = isDark ? '#121b2d' : '#dde5f0';
+    let fill = isDark ? '#121b2d' : '#f8fafc';
     let fillOpacity = 0.96;
-    let stroke = isDark ? '#1e2c46' : '#ffffff';
+    let stroke = isDark ? '#1e2c46' : '#cbd5e1';
 
     if (stat) {
       if (stat.strength === 1) {
         fill = `url(#${hatchId})`;
-        stroke = isDark ? 'rgba(56, 189, 248, 0.4)' : '#93c5fd';
+        stroke = isDark ? 'rgba(56, 189, 248, 0.4)' : '#60a5fa';
       } else {
         // Color directly by aiUserShare so map fill matches the exact % shown in sidebar & tooltips
         fill = indexToColor(stat.aiUserShare);
@@ -423,9 +437,9 @@ export function WorldRadarMap({
             ? 0.82
             : 0.94
           : stat.strength === 2
-            ? 0.82
-            : 0.92;
-        stroke = isDark ? 'rgba(255, 255, 255, 0.25)' : '#ffffff';
+            ? 0.86
+            : 0.95;
+        stroke = isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(15, 23, 42, 0.2)';
       }
     }
 
@@ -535,9 +549,12 @@ export function WorldRadarMap({
                     ? isDark
                       ? '#ffffff'
                       : '#0f172a'
-                    : '#ffffff'
+                    : isDark
+                      ? '#ffffff'
+                      : '#0f172a'
               }
-              strokeWidth={(isMyCity ? 2 : 1.3) / Math.sqrt(transform.k)}
+              strokeOpacity={isDark || isMyCity || isSelected ? 1 : 0.45}
+              strokeWidth={(isMyCity ? 2 : 1.35) / Math.sqrt(transform.k)}
             />
           </g>
         );
@@ -586,7 +603,7 @@ export function WorldRadarMap({
             patternUnits="userSpaceOnUse"
             patternTransform={`rotate(45) scale(${1 / Math.sqrt(transform.k)})`}
           >
-            <rect width="7" height="7" fill="#dbeafe" />
+            <rect width="7" height="7" fill="#eff6ff" />
             <line
               x1="0"
               y1="0"
@@ -594,7 +611,7 @@ export function WorldRadarMap({
               y2="7"
               stroke="#3b82f6"
               strokeWidth="1.6"
-              strokeOpacity="0.28"
+              strokeOpacity="0.38"
             />
           </pattern>
           <pattern
@@ -795,16 +812,16 @@ export function WorldRadarMap({
         )}
       </svg>
 
-      {/* Visual Before/After Split Curtain Divider & Interactive Period Labels */}
+      {/* Visual Before/After Split Curtain Divider & Handle-Attached Period Selectors */}
       {showSplit && (() => {
         const dividerPx = containerSize.w * (splitPct / 100);
-        const leftWidth = leftPillRef.current?.offsetWidth || 175;
-        const rightWidth = rightPillRef.current?.offsetWidth || 155;
+        const leftWidth = leftPillRef.current?.offsetWidth || 120;
+        const rightWidth = rightPillRef.current?.offsetWidth || 120;
         const hideLeftPill =
-          openSideMenu !== 'before' && dividerPx < 16 + leftWidth + 14;
+          openSideMenu !== 'before' && dividerPx < 28 + leftWidth + 12;
         const hideRightPill =
           openSideMenu !== 'after' &&
-          dividerPx > containerSize.w - (16 + rightWidth + 14);
+          dividerPx > containerSize.w - (28 + rightWidth + 12);
 
         const beforeIndex = HISTORY_PERIODS.indexOf(beforePeriod);
         const afterIndex = HISTORY_PERIODS.indexOf(afterPeriod);
@@ -813,7 +830,7 @@ export function WorldRadarMap({
 
         return (
           <>
-            {/* Draggable vertical curtain divider — sits cleanly behind corner pills */}
+            {/* Draggable vertical curtain divider */}
             <div
               role="slider"
               tabIndex={0}
@@ -858,188 +875,226 @@ export function WorldRadarMap({
               </div>
             </div>
 
-            {/* Left "Before" interactive period selector (auto-hides smoothly before divider touches it) */}
+            {/* Period selectors anchored right alongside the drag handle */}
             <div
-              ref={leftPillRef}
-              className={`absolute left-4 top-16 z-20 flex flex-col items-start gap-1 transition-all duration-150 sm:top-4 ${
-                hideLeftPill
-                  ? 'pointer-events-none -translate-x-2 opacity-0'
-                  : 'translate-x-0 opacity-100'
-              }`}
+              style={{ left: `${splitPct}%` }}
+              className="pointer-events-none absolute top-1/2 z-20 -translate-y-1/2"
             >
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOpenSideMenu((cur) => (cur === 'before' ? null : 'before'))
-                  }
-                  aria-haspopup="listbox"
-                  aria-expanded={openSideMenu === 'before'}
-                  className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-300/90 bg-white/95 px-3 text-xs font-bold text-slate-700 shadow-sm backdrop-blur-md transition hover:border-slate-400 hover:bg-white dark:border-slate-700 dark:bg-[#0d1526]/95 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900"
-                >
-                  <span>{t.periodLabels[beforePeriod]}</span>
-                  <ChevronDown
-                    aria-hidden="true"
-                    className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-150 ${
-                      openSideMenu === 'before' ? 'rotate-180' : ''
-                    }`}
-                  />
-                </button>
-
-                {openSideMenu === 'before' && (
-                  <div
-                    role="listbox"
-                    className="absolute left-0 top-full z-30 mt-1.5 w-44 space-y-0.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-[#0d1424]"
+              {/* Left "Before" selector */}
+              <div
+                ref={leftPillRef}
+                className={`absolute right-[26px] top-1/2 flex -translate-y-1/2 flex-col items-end transition-opacity duration-150 ${
+                  hideLeftPill
+                    ? 'pointer-events-none opacity-0'
+                    : draggingSplit
+                      ? 'pointer-events-none opacity-65'
+                      : 'pointer-events-auto opacity-100'
+                }`}
+              >
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenSideMenu((cur) => (cur === 'before' ? null : 'before'))
+                    }
+                    aria-haspopup="listbox"
+                    aria-expanded={openSideMenu === 'before'}
+                    className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-xl border border-slate-300/90 bg-white/95 px-2.5 text-xs font-bold text-slate-700 shadow-md backdrop-blur-md transition hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-[#0d1526]/95 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-800/95"
                   >
-                    {beforeOptions.map((opt) => {
-                      const optIdx = HISTORY_PERIODS.indexOf(opt);
-                      const disabled = optIdx >= afterIndex;
-                      const selected = opt === beforePeriod;
-                      return (
-                        <button
-                          key={opt}
-                          type="button"
-                          role="option"
-                          aria-selected={selected}
-                          disabled={disabled}
-                          onClick={() => {
-                            onChangeBeforePeriod?.(opt);
-                            setOpenSideMenu(null);
-                          }}
-                          className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold transition ${
-                            selected
-                              ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300'
-                              : disabled
-                                ? 'cursor-not-allowed text-slate-300 dark:text-slate-600'
-                                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/80'
-                          }`}
+                    <span>{formatPeriodDate(beforePeriod, locale)}</span>
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-150 ${
+                        openSideMenu === 'before' ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+
+                  {openSideMenu === 'before' && (
+                    <div
+                      role="listbox"
+                      className="absolute right-0 top-full z-30 mt-1.5 w-52 space-y-0.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-[#0d1424]"
+                    >
+                      {beforeOptions.map((opt) => {
+                        const optIdx = HISTORY_PERIODS.indexOf(opt);
+                        const disabled = optIdx >= afterIndex;
+                        const selected = opt === beforePeriod;
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            role="option"
+                            aria-selected={selected}
+                            disabled={disabled}
+                            onClick={() => {
+                              onChangeBeforePeriod?.(opt);
+                              setOpenSideMenu(null);
+                            }}
+                            className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold transition ${
+                              selected
+                                ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300'
+                                : disabled
+                                  ? 'cursor-not-allowed text-slate-300 dark:text-slate-600'
+                                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/80'
+                            }`}
+                          >
+                            <span className="truncate">{t.periodLabels[opt]}</span>
+                            <span className="flex shrink-0 items-center gap-1.5">
+                              <span className="text-[11px] font-normal opacity-60">
+                                {formatPeriodDate(opt, locale)}
+                              </span>
+                              {selected && <Check className="h-3.5 w-3.5" />}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {beforeSummary && (
+                  <div
+                    className={`pointer-events-none absolute right-0 top-full mt-1 whitespace-nowrap rounded-lg bg-white/85 px-2 py-0.5 text-[11px] font-semibold text-slate-600 shadow-xs backdrop-blur-sm transition-opacity duration-150 dark:bg-[#0d1526]/85 dark:text-slate-300 ${
+                      draggingSplit || openSideMenu === 'before'
+                        ? 'opacity-0'
+                        : 'opacity-100'
+                    }`}
+                  >
+                    <span className="num-tabular">
+                      {formatCountriesShort(
+                        beforeSummary.countries,
+                        locale,
+                        t.timelineCountriesShort,
+                      )}
+                    </span>
+                    {beforeSummary.aiShare !== null && (
+                      <>
+                        <span className="mx-1.5 opacity-40">·</span>
+                        <span
+                          className="num-tabular font-bold"
+                          style={{ color: indexToColor(beforeSummary.aiShare) }}
                         >
-                          <span>{t.periodLabels[opt]}</span>
-                          {selected && <Check className="h-3.5 w-3.5" />}
-                        </button>
-                      );
-                    })}
+                          {t.timelineAiShort.replace(
+                            '{pct}',
+                            String(beforeSummary.aiShare),
+                          )}
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
 
-              {beforeSummary && (
-                <div className="pointer-events-none whitespace-nowrap rounded-lg bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-slate-600 shadow-xs backdrop-blur-sm dark:bg-[#0d1526]/80 dark:text-slate-300">
-                  <span className="num-tabular">
-                    {formatCountriesShort(
-                      beforeSummary.countries,
-                      locale,
-                      t.timelineCountriesShort,
-                    )}
-                  </span>
-                  {beforeSummary.aiShare !== null && (
-                    <>
-                      <span className="mx-1.5 opacity-40">·</span>
+              {/* Right "After" selector */}
+              <div
+                ref={rightPillRef}
+                className={`absolute left-[26px] top-1/2 flex -translate-y-1/2 flex-col items-start transition-opacity duration-150 ${
+                  hideRightPill
+                    ? 'pointer-events-none opacity-0'
+                    : draggingSplit
+                      ? 'pointer-events-none opacity-65'
+                      : 'pointer-events-auto opacity-100'
+                }`}
+              >
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenSideMenu((cur) => (cur === 'after' ? null : 'after'))
+                    }
+                    aria-haspopup="listbox"
+                    aria-expanded={openSideMenu === 'after'}
+                    className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-xl border border-sky-400/60 bg-sky-50/95 px-2.5 text-xs font-bold text-sky-950 shadow-md backdrop-blur-md transition hover:border-sky-500 hover:bg-sky-100/95 dark:border-sky-500/45 dark:bg-sky-950/90 dark:text-sky-100 dark:hover:border-sky-400 dark:hover:bg-sky-900/95"
+                  >
+                    {afterPeriod === 'now' && (
                       <span
-                        className="num-tabular font-bold"
-                        style={{ color: indexToColor(beforeSummary.aiShare) }}
-                      >
-                        {t.timelineAiShort.replace(
-                          '{pct}',
-                          String(beforeSummary.aiShare),
-                        )}
-                      </span>
-                    </>
+                        className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <span>{formatPeriodDate(afterPeriod, locale)}</span>
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={`h-3.5 w-3.5 text-sky-500/80 transition-transform duration-150 ${
+                        openSideMenu === 'after' ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+
+                  {openSideMenu === 'after' && (
+                    <div
+                      role="listbox"
+                      className="absolute left-0 top-full z-30 mt-1.5 w-52 space-y-0.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-[#0d1424]"
+                    >
+                      {afterOptions.map((opt) => {
+                        const optIdx = HISTORY_PERIODS.indexOf(opt);
+                        const disabled = optIdx <= beforeIndex;
+                        const selected = opt === afterPeriod;
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            role="option"
+                            aria-selected={selected}
+                            disabled={disabled}
+                            onClick={() => {
+                              onChangeAfterPeriod?.(opt);
+                              setOpenSideMenu(null);
+                            }}
+                            className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold transition ${
+                              selected
+                                ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300'
+                                : disabled
+                                  ? 'cursor-not-allowed text-slate-300 dark:text-slate-600'
+                                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/80'
+                            }`}
+                          >
+                            <span className="truncate">{t.periodLabels[opt]}</span>
+                            <span className="flex shrink-0 items-center gap-1.5">
+                              <span className="text-[11px] font-normal opacity-60">
+                                {formatPeriodDate(opt, locale)}
+                              </span>
+                              {selected && <Check className="h-3.5 w-3.5" />}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            {/* Right "After" interactive period selector (auto-hides smoothly before divider touches it) */}
-            <div
-              ref={rightPillRef}
-              className={`absolute right-4 top-16 z-20 flex flex-col items-end gap-1 transition-all duration-150 sm:top-4 ${
-                hideRightPill
-                  ? 'pointer-events-none translate-x-2 opacity-0'
-                  : 'translate-x-0 opacity-100'
-              }`}
-            >
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOpenSideMenu((cur) => (cur === 'after' ? null : 'after'))
-                  }
-                  aria-haspopup="listbox"
-                  aria-expanded={openSideMenu === 'after'}
-                  className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl border border-sky-400/60 bg-sky-50/95 px-3 text-xs font-bold text-sky-950 shadow-sm backdrop-blur-md transition hover:border-sky-500 hover:bg-sky-100/95 dark:border-sky-500/45 dark:bg-sky-950/90 dark:text-sky-100 dark:hover:border-sky-400"
-                >
-                  <span>{t.periodLabels[afterPeriod]}</span>
-                  <ChevronDown
-                    aria-hidden="true"
-                    className={`h-3.5 w-3.5 text-sky-500/80 transition-transform duration-150 ${
-                      openSideMenu === 'after' ? 'rotate-180' : ''
-                    }`}
-                  />
-                </button>
-
-                {openSideMenu === 'after' && (
+                {afterSummary && (
                   <div
-                    role="listbox"
-                    className="absolute right-0 top-full z-30 mt-1.5 w-44 space-y-0.5 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-[#0d1424]"
+                    className={`pointer-events-none absolute left-0 top-full mt-1 whitespace-nowrap rounded-lg bg-white/85 px-2 py-0.5 text-[11px] font-semibold text-slate-600 shadow-xs backdrop-blur-sm transition-opacity duration-150 dark:bg-[#0d1526]/85 dark:text-slate-300 ${
+                      draggingSplit || openSideMenu === 'after'
+                        ? 'opacity-0'
+                        : 'opacity-100'
+                    }`}
                   >
-                    {afterOptions.map((opt) => {
-                      const optIdx = HISTORY_PERIODS.indexOf(opt);
-                      const disabled = optIdx <= beforeIndex;
-                      const selected = opt === afterPeriod;
-                      return (
-                        <button
-                          key={opt}
-                          type="button"
-                          role="option"
-                          aria-selected={selected}
-                          disabled={disabled}
-                          onClick={() => {
-                            onChangeAfterPeriod?.(opt);
-                            setOpenSideMenu(null);
-                          }}
-                          className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold transition ${
-                            selected
-                              ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300'
-                              : disabled
-                                ? 'cursor-not-allowed text-slate-300 dark:text-slate-600'
-                                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/80'
-                          }`}
+                    <span className="num-tabular">
+                      {formatCountriesShort(
+                        afterSummary.countries,
+                        locale,
+                        t.timelineCountriesShort,
+                      )}
+                    </span>
+                    {afterSummary.aiShare !== null && (
+                      <>
+                        <span className="mx-1.5 opacity-40">·</span>
+                        <span
+                          className="num-tabular font-bold"
+                          style={{ color: indexToColor(afterSummary.aiShare) }}
                         >
-                          <span>{t.periodLabels[opt]}</span>
-                          {selected && <Check className="h-3.5 w-3.5" />}
-                        </button>
-                      );
-                    })}
+                          {t.timelineAiShort.replace(
+                            '{pct}',
+                            String(afterSummary.aiShare),
+                          )}
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
-
-              {afterSummary && (
-                <div className="pointer-events-none whitespace-nowrap rounded-lg bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-slate-600 shadow-xs backdrop-blur-sm dark:bg-[#0d1526]/80 dark:text-slate-300">
-                  <span className="num-tabular">
-                    {formatCountriesShort(
-                      afterSummary.countries,
-                      locale,
-                      t.timelineCountriesShort,
-                    )}
-                  </span>
-                  {afterSummary.aiShare !== null && (
-                    <>
-                      <span className="mx-1.5 opacity-40">·</span>
-                      <span
-                        className="num-tabular font-bold"
-                        style={{ color: indexToColor(afterSummary.aiShare) }}
-                      >
-                        {t.timelineAiShort.replace(
-                          '{pct}',
-                          String(afterSummary.aiShare),
-                        )}
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
           </>
         );

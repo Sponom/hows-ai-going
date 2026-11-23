@@ -63,7 +63,7 @@ export interface RecentSignal {
   lng: number | null;
   level: UsageLevel;
   context: UsageContext;
-  role: RoleId;
+  role: RoleId | null;
   domains: RoleId[];
   symptom: SymptomId | null;
   createdAt: number;
