@@ -80,6 +80,11 @@ export default function App() {
     const sector = params.get('sector')?.toUpperCase();
     return sector && sector.length === 2 ? sector : null;
   });
+  const [initialCityParam, setInitialCityParam] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const city = params.get('city')?.trim();
+    return city ? city : null;
+  });
   const [selectedCity, setSelectedCity] = useState<CityStat | null>(null);
   const [focusTarget, setFocusTarget] = useState<{ lat: number; lng: number } | null>(
     null,
@@ -99,7 +104,11 @@ export default function App() {
       return false;
     }
   });
-  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  const [mobilePanelOpen, setMobilePanelOpen] = useState<boolean>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sector = params.get('sector')?.toUpperCase();
+    return Boolean(sector && sector.length === 2);
+  });
   const [desktopPanelOpen, setDesktopPanelOpen] = useState(true);
   const [report, setReport] = useState<FieldReportResponse | null>(null);
   const [reportJustSubmitted, setReportJustSubmitted] = useState(false);
@@ -120,6 +129,26 @@ export default function App() {
   const beforeSnapshot = snapshotsByPeriod[beforePeriod] ?? nowSnapshot;
   const afterSnapshot = snapshotsByPeriod[afterPeriod] ?? nowSnapshot;
 
+  // Hydrate shared city deep-link (?sector=JP&city=Tokyo) once snapshot arrives
+  useEffect(() => {
+    if (!initialCityParam || !selectedCountry || !nowSnapshot) return;
+    const match = nowSnapshot.cities.find(
+      (c) =>
+        c.countryCode === selectedCountry &&
+        c.cityName.toLowerCase() === initialCityParam.toLowerCase(),
+    );
+    setInitialCityParam(null);
+    if (match) {
+      setSelectedCountry(null);
+      setSelectedCity(match);
+      if (match.lat !== null && match.lng !== null) {
+        setFocusTarget({ lat: match.lat, lng: match.lng });
+      }
+      setMobilePanelOpen(true);
+      setDesktopPanelOpen(true);
+    }
+  }, [initialCityParam, selectedCountry, nowSnapshot]);
+
   const buildSharePayload = (override?: {
     countryCode?: string | null;
     cityName?: string | null;
@@ -127,8 +156,15 @@ export default function App() {
   }) => {
     const url = new URL(window.location.origin + window.location.pathname);
     const targetCountry =
-      override?.countryCode !== undefined ? override.countryCode : selectedCountry;
+      override?.countryCode !== undefined
+        ? override.countryCode
+        : selectedCity?.countryCode ?? selectedCountry;
+    const targetCity =
+      override?.cityName !== undefined
+        ? override.cityName
+        : selectedCity?.cityName ?? null;
     if (targetCountry) url.searchParams.set('sector', targetCountry);
+    if (targetCountry && targetCity) url.searchParams.set('city', targetCity);
     if (roleFilter !== 'all') url.searchParams.set('role', roleFilter);
     if (symptomFilter !== 'all') url.searchParams.set('case', symptomFilter);
 
@@ -137,14 +173,23 @@ export default function App() {
       const countryStat = nowSnapshot?.countries.find(
         (c) => c.countryCode === targetCountry,
       );
+      const cityStat = targetCity
+        ? nowSnapshot?.cities.find(
+            (c) =>
+              c.countryCode === targetCountry &&
+              c.cityName.toLowerCase() === targetCity.toLowerCase(),
+          )
+        : null;
       const pct =
         override?.aiShare !== undefined
           ? override.aiShare
-          : countryStat && countryStat.strength >= 2
-            ? countryStat.aiUserShare
-            : null;
-      const placeName = override?.cityName
-        ? `${getCityDisplayName(override.cityName, targetCountry, locale)}, ${getCountryName(targetCountry, locale)}`
+          : cityStat && cityStat.strength >= 2
+            ? cityStat.aiUserShare
+            : countryStat && countryStat.strength >= 2
+              ? countryStat.aiUserShare
+              : null;
+      const placeName = targetCity
+        ? `${getCityDisplayName(targetCity, targetCountry, locale)}, ${getCountryName(targetCountry, locale)}`
         : getCountryName(targetCountry, locale);
       if (pct !== null) {
         text = t.shareTextCountry
