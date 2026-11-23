@@ -113,6 +113,7 @@ export async function downloadShareCard(
   ctx.strokeStyle = `${accentColor}70`;
   ctx.stroke();
 
+  ctx.fillStyle = '#ffffff';
   ctx.font = '82px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
