@@ -38,7 +38,7 @@ npx wrangler secret put HASH_SALT
 pnpm deploy
 ```
 
-Staging URL: `https://hows-ai-going.sponom.workers.dev`
+Production URL: `https://howsaigoing.org` (staging: `https://hows-ai-going.sponom.workers.dev`)
 
 ## Documentation
 - [docs/CONCEPT.md](./docs/CONCEPT.md) — product concept, taxonomy, and backlog.

@@ -26,6 +26,15 @@ import { extractGeoFromRequest, sanitizeCityName } from './geo';
 
 const app = new Hono<{ Bindings: Env }>();
 
+app.use('*', async (c, next) => {
+  const url = new URL(c.req.url);
+  if (url.hostname === 'www.howsaigoing.org') {
+    url.hostname = 'howsaigoing.org';
+    return c.redirect(url.toString(), 301);
+  }
+  await next();
+});
+
 const ROLE_SET = new Set<string>(ROLES);
 const CONTEXT_SET = new Set<string>(['none', 'personal', 'work', 'both']);
 const AI_SYMPTOM_SET = new Set<string>(AI_SYMPTOMS);
