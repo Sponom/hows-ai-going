@@ -4,8 +4,8 @@ import { writeFileSync } from 'node:fs';
  * Survey-calibrated baseline generator (2024–2026 global AI usage studies:
  * Ipsos Global AI Monitor, Microsoft AI Diffusion Report, Pew Research, Salesforce).
  *
- * Produces deterministic, geographically realistic baseline data across 33 countries
- * (26 calibrated + 7 low-data/calibrating) with authentic 12-month historical snapshots
+ * Produces deterministic, geographically realistic baseline data across 45 countries
+ * (35 calibrated + 10 low-data/calibrating) with authentic 12-month historical snapshots
  * so "World then & now" reflects real-world adoption growth.
  */
 const SECTORS = [
@@ -61,6 +61,22 @@ const SECTORS = [
   { cc: 'IS', city: 'Reykjavik', lat: 64.1, lng: -21.9, n: 4, share12m: 0.20, shareNow: 0.35 },
 ];
 
+// Week-2 baseline expansion (+12 countries / +256 signals: 9 calibrated + 3 calibrating)
+const WEEK2_SECTORS = [
+  { cc: 'NO', city: 'Oslo', lat: 59.9, lng: 10.8, n: 26, share12m: 0.31, shareNow: 0.48 },
+  { cc: 'DK', city: 'Copenhagen', lat: 55.7, lng: 12.6, n: 25, share12m: 0.30, shareNow: 0.46 },
+  { cc: 'FI', city: 'Helsinki', lat: 60.2, lng: 24.9, n: 25, share12m: 0.28, shareNow: 0.44 },
+  { cc: 'CH', city: 'Zurich', lat: 47.4, lng: 8.5, n: 26, share12m: 0.27, shareNow: 0.43 },
+  { cc: 'IE', city: 'Dublin', lat: 53.3, lng: -6.3, n: 25, share12m: 0.30, shareNow: 0.47 },
+  { cc: 'CZ', city: 'Prague', lat: 50.1, lng: 14.4, n: 25, share12m: 0.25, shareNow: 0.41 },
+  { cc: 'TW', city: 'Taipei', lat: 25.0, lng: 121.5, n: 26, share12m: 0.36, shareNow: 0.56 },
+  { cc: 'CL', city: 'Santiago', lat: -33.4, lng: -70.7, n: 25, share12m: 0.29, shareNow: 0.47 },
+  { cc: 'NZ', city: 'Auckland', lat: -36.8, lng: 174.8, n: 25, share12m: 0.28, shareNow: 0.44 },
+  { cc: 'IL', city: 'Tel Aviv', lat: 32.1, lng: 34.8, n: 10, share12m: 0.42, shareNow: 0.62 },
+  { cc: 'EG', city: 'Cairo', lat: 30.0, lng: 31.2, n: 9, share12m: 0.26, shareNow: 0.44 },
+  { cc: 'NG', city: 'Lagos', lat: 6.5, lng: 3.4, n: 9, share12m: 0.34, shareNow: 0.55 },
+];
+
 const ROLES = [
   'tech', 'design', 'media', 'office', 'student', 'education',
   'health', 'trades', 'service', 'founder', 'home', 'other',
@@ -113,97 +129,127 @@ const lines = [
   'DELETE FROM signals WHERE anon_token_hash LIKE \'baseline-%\';',
 ];
 
-let idx = 0;
-let historyIdx = 0;
+function appendSectorBatch(sectors, options) {
+  const { idPrefix, tokenPrefix, ipPrefix, histPrefix, recentShare = 0 } = options;
+  let batchIdx = 0;
+  let batchHistIdx = 0;
 
-for (const s of SECTORS) {
-  // Exact counts for 12m ago vs now so each country matches research benchmarks accurately
-  const aiCountNow = Math.round(s.n * s.shareNow);
-  const aiCount12m = Math.round(s.n * s.share12m);
-  const newlyAdoptedCount = Math.max(0, aiCountNow - aiCount12m);
+  const pickRecentOrFallback = (fallbackDaysAgo) =>
+    recentShare > 0 && rand() < recentShare ? 0.2 + rand() * 6.3 : fallbackDaysAgo;
 
-  for (let i = 0; i < s.n; i++) {
-    idx += 1;
-    const tokenHash = `baseline-token-${idx}`;
+  for (const s of sectors) {
+    // Exact counts for 12m ago vs now so each country matches research benchmarks accurately
+    const aiCountNow = Math.round(s.n * s.shareNow);
+    const aiCount12m = Math.round(s.n * s.share12m);
+    const newlyAdoptedCount = Math.max(0, aiCountNow - aiCount12m);
 
-    // Role & domains
-    const d1 = pick(ROLES);
-    const d2 = rand() > 0.5 ? pick(ROLES.filter((x) => x !== d1)) : null;
-    const domains = d2 ? [d1, d2] : [d1];
+    for (let i = 0; i < s.n; i++) {
+      batchIdx += 1;
+      const tokenHash = `${tokenPrefix}${batchIdx}`;
 
-    // Group 1 (0 .. aiCount12m - 1): already using AI 12+ months ago
-    // Group 2 (aiCount12m .. aiCountNow - 1): started at level 0 a year ago (or joined mid-year) and adopted AI during the year
-    // Group 3 (aiCountNow .. s.n - 1): non-users (level 0 throughout)
-    let createdDaysAgo;
-    let initialLevel;
-    let finalLevel;
-    let upgradedDaysAgo = null;
+      // Role & domains
+      const d1 = pick(ROLES);
+      const d2 = rand() > 0.5 ? pick(ROLES.filter((x) => x !== d1)) : null;
+      const domains = d2 ? [d1, d2] : [d1];
 
-    if (i < aiCount12m) {
-      // Existed before 12m cutoff (370–410 days ago)
-      createdDaysAgo = 370 + rand() * 40;
-      initialLevel = pickAiLevel(s.share12m * 0.6);
-      finalLevel = initialLevel;
-      if (initialLevel < 3 && rand() < 0.45) {
-        finalLevel = Math.min(3, initialLevel + 1);
-        upgradedDaysAgo = 10 + rand() * 240;
-      }
-    } else if (i < aiCountNow) {
-      // Adopted AI over the past 12 months
-      const bucket = (i - aiCount12m) / Math.max(1, newlyAdoptedCount);
-      if (bucket < 0.65) {
-        // Existed 12m ago as non-user, then switched to AI at 6m / 3m / recent
-        createdDaysAgo = 370 + rand() * 35;
-        initialLevel = 0;
-        finalLevel = pickAiLevel(s.shareNow);
-        // Spread upgrades smoothly across 20..340 days ago
-        upgradedDaysAgo = Math.max(2, Math.floor((1 - bucket / 0.65) * 330 + rand() * 25));
-      } else {
-        // Newer respondent joining within the last 8 months as an AI user
-        createdDaysAgo = 2 + rand() * 230;
-        initialLevel = pickAiLevel(s.shareNow);
+      // Group 1 (0 .. aiCount12m - 1): already using AI 12+ months ago
+      // Group 2 (aiCount12m .. aiCountNow - 1): started at level 0 a year ago (or joined mid-year) and adopted AI during the year
+      // Group 3 (aiCountNow .. s.n - 1): non-users (level 0 throughout)
+      let createdDaysAgo;
+      let initialLevel;
+      let finalLevel;
+      let upgradedDaysAgo = null;
+
+      if (i < aiCount12m) {
+        // Existed before 12m cutoff (370–410 days ago)
+        createdDaysAgo = 370 + rand() * 40;
+        initialLevel = pickAiLevel(s.share12m * 0.6);
         finalLevel = initialLevel;
+        if (initialLevel < 3 && rand() < 0.45) {
+          finalLevel = Math.min(3, initialLevel + 1);
+          upgradedDaysAgo = pickRecentOrFallback(10 + rand() * 240);
+        }
+      } else if (i < aiCountNow) {
+        // Adopted AI over the past 12 months
+        const bucket = (i - aiCount12m) / Math.max(1, newlyAdoptedCount);
+        if (bucket < 0.65) {
+          // Existed 12m ago as non-user, then switched to AI at 6m / 3m / recent
+          createdDaysAgo = 370 + rand() * 35;
+          initialLevel = 0;
+          finalLevel = pickAiLevel(s.shareNow);
+          // Spread upgrades smoothly across 20..340 days ago (or this past week for w2)
+          upgradedDaysAgo = pickRecentOrFallback(
+            Math.max(2, Math.floor((1 - bucket / 0.65) * 330 + rand() * 25)),
+          );
+        } else {
+          // Newer respondent joining within the last 8 months (or this past week for w2)
+          createdDaysAgo = pickRecentOrFallback(2 + rand() * 230);
+          initialLevel = pickAiLevel(s.shareNow);
+          finalLevel = initialLevel;
+        }
+      } else {
+        // Non-user: 75% present 12m ago, 25% joined over the year
+        createdDaysAgo =
+          rand() < 0.75 ? 370 + rand() * 40 : pickRecentOrFallback(2 + rand() * 260);
+        initialLevel = 0;
+        finalLevel = 0;
       }
-    } else {
-      // Non-user: 75% present 12m ago, 25% joined over the year
-      createdDaysAgo = rand() < 0.75 ? 370 + rand() * 40 : 2 + rand() * 260;
-      initialLevel = 0;
-      finalLevel = 0;
-    }
 
-    const createdAt = Math.floor(now - createdDaysAgo * DAY_MS);
-    const updatedAt =
-      upgradedDaysAgo !== null ? Math.floor(now - upgradedDaysAgo * DAY_MS) : createdAt;
+      const createdAt = Math.floor(now - createdDaysAgo * DAY_MS);
+      const updatedAt =
+        upgradedDaysAgo !== null ? Math.floor(now - upgradedDaysAgo * DAY_MS) : createdAt;
 
-    const initCtx = deriveContext(initialLevel, domains);
-    const initSyms = pickSymptoms(initialLevel);
+      const initCtx = deriveContext(initialLevel, domains);
+      const initSyms = pickSymptoms(initialLevel);
 
-    historyIdx += 1;
-    lines.push(
-      `INSERT INTO signal_history (id, anon_token_hash, country_code, city_name, lat, lng, level, context, role, domains, symptoms, recorded_at) VALUES (` +
-        `'bhist-${historyIdx}', '${tokenHash}', '${s.cc}', '${esc(s.city)}', ${s.lat}, ${s.lng}, ${initialLevel}, '${initCtx}', '${d1}', '${esc(JSON.stringify(domains))}', '${esc(initSyms)}', ${createdAt});`,
-    );
-
-    let finalCtx = initCtx;
-    let finalSyms = initSyms;
-    if (upgradedDaysAgo !== null) {
-      finalCtx = deriveContext(finalLevel, domains);
-      finalSyms = pickSymptoms(finalLevel);
-      historyIdx += 1;
+      batchHistIdx += 1;
       lines.push(
         `INSERT INTO signal_history (id, anon_token_hash, country_code, city_name, lat, lng, level, context, role, domains, symptoms, recorded_at) VALUES (` +
-          `'bhist-${historyIdx}', '${tokenHash}', '${s.cc}', '${esc(s.city)}', ${s.lat}, ${s.lng}, ${finalLevel}, '${finalCtx}', '${d1}', '${esc(JSON.stringify(domains))}', '${esc(finalSyms)}', ${updatedAt});`,
+          `'${histPrefix}${batchHistIdx}', '${tokenHash}', '${s.cc}', '${esc(s.city)}', ${s.lat}, ${s.lng}, ${initialLevel}, '${initCtx}', '${d1}', '${esc(JSON.stringify(domains))}', '${esc(initSyms)}', ${createdAt});`,
+      );
+
+      let finalCtx = initCtx;
+      let finalSyms = initSyms;
+      if (upgradedDaysAgo !== null) {
+        finalCtx = deriveContext(finalLevel, domains);
+        finalSyms = pickSymptoms(finalLevel);
+        batchHistIdx += 1;
+        lines.push(
+          `INSERT INTO signal_history (id, anon_token_hash, country_code, city_name, lat, lng, level, context, role, domains, symptoms, recorded_at) VALUES (` +
+            `'${histPrefix}${batchHistIdx}', '${tokenHash}', '${s.cc}', '${esc(s.city)}', ${s.lat}, ${s.lng}, ${finalLevel}, '${finalCtx}', '${d1}', '${esc(JSON.stringify(domains))}', '${esc(finalSyms)}', ${updatedAt});`,
+        );
+      }
+
+      lines.push(
+        `INSERT INTO signals (id, anon_token_hash, ip_hash, country_code, city_name, lat, lng, level, context, role, domains, symptoms, created_at, updated_at) VALUES (` +
+          `'${idPrefix}${batchIdx}', '${tokenHash}', '${ipPrefix}${batchIdx % 50}', '${s.cc}', '${esc(s.city)}', ${s.lat}, ${s.lng}, ${finalLevel}, '${finalCtx}', '${d1}', '${esc(JSON.stringify(domains))}', '${esc(finalSyms)}', ${createdAt}, ${updatedAt});`,
       );
     }
-
-    lines.push(
-      `INSERT INTO signals (id, anon_token_hash, ip_hash, country_code, city_name, lat, lng, level, context, role, domains, symptoms, created_at, updated_at) VALUES (` +
-        `'base-${idx}', '${tokenHash}', 'baseline-ip-${idx % 50}', '${s.cc}', '${esc(s.city)}', ${s.lat}, ${s.lng}, ${finalLevel}, '${finalCtx}', '${d1}', '${esc(JSON.stringify(domains))}', '${esc(finalSyms)}', ${createdAt}, ${updatedAt});`,
-    );
   }
+
+  return { signals: batchIdx, history: batchHistIdx };
 }
+
+const batch1 = appendSectorBatch(SECTORS, {
+  idPrefix: 'base-',
+  tokenPrefix: 'baseline-token-',
+  ipPrefix: 'baseline-ip-',
+  histPrefix: 'bhist-',
+  recentShare: 0,
+});
+
+const batch2 = appendSectorBatch(WEEK2_SECTORS, {
+  idPrefix: 'base-w2-',
+  tokenPrefix: 'baseline-w2-token-',
+  ipPrefix: 'baseline-w2-ip-',
+  histPrefix: 'bhist-w2-',
+  recentShare: 0.5,
+});
+
+const totalSignals = batch1.signals + batch2.signals;
+const totalHistory = batch1.history + batch2.history;
 
 writeFileSync(new URL('./seed-baseline.sql', import.meta.url), lines.join('\n') + '\n');
 console.log(
-  `Generated ${idx} survey-calibrated baseline signals and ${historyIdx} history events in scripts/seed-baseline.sql`,
+  `Generated ${totalSignals} survey-calibrated baseline signals (${batch2.signals} week-2) and ${totalHistory} history events in scripts/seed-baseline.sql`,
 );
