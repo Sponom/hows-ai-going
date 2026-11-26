@@ -16,12 +16,10 @@ Rather than framing AI as hype or doom, **How’s AI Going?** captures the real 
 ## 2. User Journey
 
 1. **Explore the live map:** see global AI adoption by country and city, filter by area or use case, and compare how the world changed over the last 12 months ("World then & now").
-2. **Answer in ~15 seconds (anonymous, tap-only):**
-   - Step 1: How often do you use AI? (`Never`, `Sometimes`, `Often`, `Every day`)
-   - Step 2: Which areas apply to you? (multi-select up to 5 across 12 areas)
-   - Step 3: What do you use it for / why do you skip it? (optional multi-select)
-   - Step 4: Country & optional city (auto-suggested from Cloudflare edge geo, editable)
-3. **See your personal report:** a short summary comparing your answer against your country, city, and area, plus a quick link to invite friends.
+2. **Answer in ~5 seconds (1-step anonymous check-in):**
+   - Pick how often you use AI (`Never`, `Once in a while`, `Regularly`, `Every day`) with auto-suggested Cloudflare edge location (`Country` & optional `City`, editable).
+   - Optionally expand **Add details** to tag up to 5 areas and any AI use cases / reasons for skipping AI.
+3. **See & share your personal report:** a short summary comparing your answer against your country and area, plus a downloadable `1080×1080` PNG verdict card and deep link.
 
 ---
 
@@ -80,10 +78,10 @@ Thresholds live in [`shared/config.ts`](../shared/config.ts) (`country: 25 / 150
 
 ---
 
-## 6. Future Backlog (Post-MVP)
-- [ ] Complete localization for the 5 secondary languages (`es`, `pt-BR`, `de`, `ja`, `ko`).
-- [ ] Auto-open mobile country card when arriving via a `?sector=XX` deep link.
-- [ ] Lazy-load `world-atlas` geometry to trim initial JS bundle size.
+## 6. Roadmap
+- [x] Complete localization for all 7 languages (`en`, `ru`, `es`, `pt-BR`, `de`, `ja`, `ko`).
+- [x] Auto-open mobile country card when arriving via a `?sector=XX` or `/country/xx` deep link.
+- [x] Lazy-load `world-atlas` geometry to trim initial JS bundle size.
+- [x] Custom domain connection (`howsaigoing.org`) and automated Cloudflare Workers Builds from GitHub.
 - [ ] Invisible Cloudflare Turnstile if traffic spikes virally.
 - [ ] Pre-aggregated snapshots / SQL aggregation once volume scales past ~50k answers.
-- [ ] Custom domain connection and automated Cloudflare Workers Builds from GitHub.
