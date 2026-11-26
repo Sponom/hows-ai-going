@@ -373,11 +373,179 @@ app.post('/api/feedback', async (c) => {
   return c.json(result, 200, { 'Cache-Control': 'no-store' });
 });
 
-app.all('*', async (c) => {
-  if (c.env.ASSETS) {
-    return c.env.ASSETS.fetch(c.req.raw);
+const ROLE_SEO_LABELS: Record<RoleId, string> = {
+  tech: 'Tech & Coding',
+  design: 'Design & Creative',
+  media: 'Writing & Marketing',
+  office: 'Business & Office',
+  student: 'Studying',
+  education: 'Teaching & Science',
+  health: 'Healthcare',
+  trades: 'Hands-on & Trades',
+  service: 'Service & Sales',
+  founder: 'Own Business & Freelance',
+  home: 'Home & Family',
+  other: 'Hobbies & Fun',
+};
+
+const SITEMAP_COUNTRIES = [
+  'US', 'GB', 'DE', 'FR', 'JP', 'KR', 'IN', 'BR', 'CA', 'AU',
+  'ES', 'IT', 'NL', 'SE', 'PL', 'SG', 'AE', 'TH', 'ID', 'MY',
+  'MX', 'AR', 'PT', 'TR', 'ZA', 'RU',
+];
+
+function getCountryDisplayEn(code: string): string {
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) ?? code;
+  } catch {
+    return code;
   }
-  return c.text('Not Found', 404);
+}
+
+app.get('/robots.txt', (c) => {
+  const origin = new URL(c.req.url).origin;
+  const body = `User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${origin}/sitemap.xml\n`;
+  return c.text(body, 200, {
+    'Cache-Control': 'public, max-age=3600',
+  });
+});
+
+app.get('/sitemap.xml', (c) => {
+  const origin = new URL(c.req.url).origin;
+  const urls: Array<{ loc: string; changefreq: string; priority: string }> = [
+    { loc: `${origin}/`, changefreq: 'daily', priority: '1.0' },
+    ...SITEMAP_COUNTRIES.map((cc) => ({
+      loc: `${origin}/country/${cc.toLowerCase()}`,
+      changefreq: 'weekly',
+      priority: '0.8',
+    })),
+    ...ROLES.map((role) => ({
+      loc: `${origin}/area/${role}`,
+      changefreq: 'weekly',
+      priority: '0.7',
+    })),
+  ];
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
+    .map(
+      (u) =>
+        `  <url><loc>${u.loc}</loc><changefreq>${u.changefreq}</changefreq><priority>${u.priority}</priority></url>`,
+    )
+    .join('\n')}\n</urlset>\n`;
+
+  return c.body(xml, 200, {
+    'Content-Type': 'application/xml; charset=utf-8',
+    'Cache-Control': 'public, max-age=3600',
+  });
+});
+
+app.all('*', async (c) => {
+  if (!c.env.ASSETS) {
+    return c.text('Not Found', 404);
+  }
+
+  const reqUrl = new URL(c.req.url);
+  const res = await c.env.ASSETS.fetch(c.req.raw);
+  const contentType = res.headers.get('content-type') ?? '';
+  if (!contentType.includes('text/html')) {
+    return res;
+  }
+
+  // Dynamic edge SEO & Open Graph tags for custom domains, /country/:cc, /area/:role, and ?sector=XX
+  const origin = reqUrl.origin;
+  const countryMatch = reqUrl.pathname.match(/^\/country\/([a-z]{2})\/?$/i);
+  const areaMatch = reqUrl.pathname.match(/^\/area\/([a-z_-]+)\/?$/i);
+  const sectorParam = (countryMatch?.[1] ?? reqUrl.searchParams.get('sector'))?.toUpperCase() ?? null;
+  const areaParam = (areaMatch?.[1] ?? reqUrl.searchParams.get('role'))?.toLowerCase() ?? null;
+
+  let pageTitle = 'How’s AI Going? — Live Map of Real-World AI Usage';
+  let pageDesc =
+    'Anonymous live world map showing how everyday people around the world actually use AI across work, study, and daily life — or why they skip it.';
+  let canonicalUrl = `${origin}/`;
+
+  if (sectorParam && ALPHA2_SET.has(sectorParam)) {
+    const countryName = getCountryDisplayEn(sectorParam);
+    canonicalUrl = `${origin}/country/${sectorParam.toLowerCase()}`;
+    try {
+      const row = await c.env.DB.prepare(
+        `SELECT COUNT(*) as cnt, SUM(CASE WHEN level >= 1 THEN 1 ELSE 0 END) as ai_cnt
+         FROM signals WHERE country_code = ?`,
+      )
+        .bind(sectorParam)
+        .first<{ cnt: number; ai_cnt: number | null }>();
+      const cnt = row?.cnt ?? 0;
+      const aiPct = cnt > 0 ? Math.round(((row?.ai_cnt ?? 0) / cnt) * 100) : null;
+      if (cnt >= APP_CONFIG.thresholds.country.preliminary && aiPct !== null) {
+        pageTitle = `AI Usage in ${countryName}: ${aiPct}% Use AI — How’s AI Going?`;
+        pageDesc = `${aiPct}% of respondents in ${countryName} use AI across work and everyday life. Explore live data and add your 5-second anonymous answer.`;
+      } else {
+        pageTitle = `AI Usage in ${countryName} — How’s AI Going?`;
+        pageDesc = `See live anonymous AI usage check-ins in ${countryName} and help unlock the country score on How’s AI Going?.`;
+      }
+    } catch {
+      pageTitle = `AI Usage in ${countryName} — How’s AI Going?`;
+    }
+  } else if (areaParam && ROLE_SET.has(areaParam)) {
+    const areaName = ROLE_SEO_LABELS[areaParam as RoleId];
+    canonicalUrl = `${origin}/area/${areaParam}`;
+    pageTitle = `How People in ${areaName} Use AI — How’s AI Going?`;
+    pageDesc = `Live anonymous global map of AI adoption in ${areaName}: how often people use AI, top use cases, and why others skip it.`;
+  }
+
+  const ogImageUrl = `${origin}/og-image.png`;
+  const rewriter = new HTMLRewriter()
+    .on('title', {
+      element(el) {
+        el.setInnerContent(pageTitle);
+      },
+    })
+    .on('link[rel="canonical"]', {
+      element(el) {
+        el.setAttribute('href', canonicalUrl);
+      },
+    })
+    .on('meta[name="description"]', {
+      element(el) {
+        el.setAttribute('content', pageDesc);
+      },
+    })
+    .on('meta[property="og:url"]', {
+      element(el) {
+        el.setAttribute('content', canonicalUrl);
+      },
+    })
+    .on('meta[property="og:title"]', {
+      element(el) {
+        el.setAttribute('content', pageTitle);
+      },
+    })
+    .on('meta[property="og:description"]', {
+      element(el) {
+        el.setAttribute('content', pageDesc);
+      },
+    })
+    .on('meta[property="og:image"]', {
+      element(el) {
+        el.setAttribute('content', ogImageUrl);
+      },
+    })
+    .on('meta[name="twitter:title"]', {
+      element(el) {
+        el.setAttribute('content', pageTitle);
+      },
+    })
+    .on('meta[name="twitter:description"]', {
+      element(el) {
+        el.setAttribute('content', pageDesc);
+      },
+    })
+    .on('meta[name="twitter:image"]', {
+      element(el) {
+        el.setAttribute('content', ogImageUrl);
+      },
+    });
+
+  return rewriter.transform(res);
 });
 
 export default app;

@@ -58,7 +58,8 @@ export default function App() {
   const [locale, setLocale] = useState<Locale>(() => detectInitialLocale());
   const [theme, setTheme] = useState<'dark' | 'light'>(() => detectInitialTheme());
   const [roleFilter, setRoleFilter] = useState<RoleId | 'all'>(() => {
-    const r = new URLSearchParams(window.location.search).get('role');
+    const pathMatch = window.location.pathname.match(/^\/area\/([a-z_-]+)\/?$/i);
+    const r = pathMatch?.[1]?.toLowerCase() ?? new URLSearchParams(window.location.search).get('role');
     return r && (ROLES as readonly string[]).includes(r) ? (r as RoleId) : 'all';
   });
   const [symptomFilter, setSymptomFilter] = useState<SymptomId | 'all'>(() => {
@@ -76,8 +77,9 @@ export default function App() {
   const [afterPeriod, setAfterPeriod] = useState<HistoryPeriod>('now');
 
   const [selectedCountry, setSelectedCountry] = useState<string | null>(() => {
+    const pathMatch = window.location.pathname.match(/^\/country\/([a-z]{2})\/?$/i);
     const params = new URLSearchParams(window.location.search);
-    const sector = params.get('sector')?.toUpperCase();
+    const sector = (pathMatch?.[1] ?? params.get('sector'))?.toUpperCase();
     return sector && sector.length === 2 ? sector : null;
   });
   const [initialCityParam, setInitialCityParam] = useState<string | null>(() => {
@@ -105,8 +107,9 @@ export default function App() {
     }
   });
   const [mobilePanelOpen, setMobilePanelOpen] = useState<boolean>(() => {
+    const pathMatch = window.location.pathname.match(/^\/country\/([a-z]{2})\/?$/i);
     const params = new URLSearchParams(window.location.search);
-    const sector = params.get('sector')?.toUpperCase();
+    const sector = (pathMatch?.[1] ?? params.get('sector'))?.toUpperCase();
     return Boolean(sector && sector.length === 2);
   });
   const [desktopPanelOpen, setDesktopPanelOpen] = useState(true);
